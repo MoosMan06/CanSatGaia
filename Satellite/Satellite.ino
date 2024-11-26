@@ -1,4 +1,5 @@
 /*
+  pin layout for UNO board, this will change when we switch to Arduino NANO
  gnd > gnd
  VCC > 5V
  EN > Disconnected
