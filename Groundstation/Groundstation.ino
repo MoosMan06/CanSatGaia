@@ -12,7 +12,7 @@
 SoftwareSerial mySerial(9, 10);
 
 char message;
-
+// test gideon
 void setup() {
 
   Serial.begin(9600);
