@@ -1,27 +1,16 @@
-/*
- gnd > gnd
- VCC > 5V
- EN > Disconnected
- RXD > D10
- TXD > D9
- AUX > Disconnected
- SET > Disconnected
-*/
-
 #include <SoftwareSerial.h>
-SoftwareSerial mySerial(9, 10);
 
-char message;
-// test gideon
+SoftwareSerial mySerial(10, 11);
+
 void setup() {
-
   Serial.begin(9600);
   mySerial.begin(9600);
 }
 
 void loop() {
-
-  message = mySerial.listen();
-  Serial.println(message);
+  if (mySerial.available()) {
+    String input = mySerial.readString();
+    Serial.println(input);
+  }
   delay(1);
 }
