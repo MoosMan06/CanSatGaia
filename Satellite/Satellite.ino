@@ -1,5 +1,7 @@
 #include <SoftwareSerial.h>
 
+//apc220 config: 450000 2400 9 9600 0
+
 SoftwareSerial mySerial(10, 11);
 
 int number = 0;
