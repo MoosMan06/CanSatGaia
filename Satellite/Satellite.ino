@@ -50,7 +50,7 @@ void loop() {
   String PacketNumber = String(Number); //string conversion magic is currently untested
 
   float Temp = bmp.readTemperature(); // temperature in *C
-  int Pres = bmp.readPressure(); // pressure in Pa
+  float Pres = bmp.readPressure(); // pressure in Pa
   
   String packet = String(PacketNumber + "/" + Temp + "/" + Pres);
   Serial.println(packet);
