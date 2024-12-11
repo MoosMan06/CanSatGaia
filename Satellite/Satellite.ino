@@ -33,8 +33,6 @@ SDA/SDI <-> 11  (required, MOSI)
 #include <TinyGPS++.h>       //gps
 
 #define MPU9250_ADDR 0x68
-static const int RXPin = 4, TXPin = 3;
-static const uint32_t GPSBaud = 9600;
 TinyGPSPlus gps;
 
 MPU9250_WE myMPU9250 = MPU9250_WE(MPU9250_ADDR);
@@ -50,10 +48,20 @@ Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 SoftwareSerial commsSerial(8, 7);
 SoftwareSerial gpsSerial(4, 3);
 
+static void smartDelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  do 
+  {
+    while (gpsSerial.available())
+      gps.encode(gpsSerial.read());
+  } while (millis() - start < ms);
+}
+
 void setup() {
   Serial.begin(9600);
   commsSerial.begin(9600);
-  gpsSerial.begin(GPSBaud);
+  gpsSerial.begin(9600);
   Wire.begin();
 
   if(!myMPU9250.init()){
@@ -63,7 +71,7 @@ void setup() {
     Serial.println("MPU9250 is connected");
   }
   Serial.println("Position you MPU9250 flat and don't move it - calibrating..."); //gyro calibration
-  delay(1000);
+  smartDelay(1000);
   myMPU9250.autoOffsets();
   Serial.println("Done!");
   myMPU9250.setAccRange(MPU9250_ACC_RANGE_2G);// can't measure more than 2G rn, calculate our max G forces later and change this to 4, 8 or 16G
@@ -85,22 +93,23 @@ void loop() {
   Number++;
   String PacketNumber = String(Number); //string conversion magic is currently untested
 
-  xyzFloat gValue = myMPU9250.getGValues();
-  xyzFloat angle = myMPU9250.getAngles();
+  String hour = String(TinyGPSTime.hour);
+  String mins = String(TinyGPSTime.minute);
+  String secs = String(TinyGPSTime.second);
+
+
+  String time = String(hour + ":" + mins + ":" + secs); //time
+//  String pos = String(gps.location.lat() ":" gps.location.lng());
+
+//  String gforces = String(myMPU9250.getGValues().x + ":" + myMPU9250.getGValues().y + ":" + myMPU9250.getGValues().z); // g forces
+//  String angles = String(myMPU9250.getAngles().x + ":" + myMPU9250.getAngles().y + ":" + myMPU9250.getAngles().z); // angles in degrees
 
   float Temp = bmp.readTemperature(); // temperature in *C
   float Pres = bmp.readPressure(); // pressure in Pa
-  while(gpsSerial.available() > 0){
-    gps.encode(gpsSerial.read());
-    if (gps.location.isUpdated()){
-      PosLa = gps.location.lat();
-      PosLo = gps.location.lng();
-    }
-  }
-  
-  String packet = String(PacketNumber + "/" + Temp + "/" + Pres + "/" + angle.x + "/" + angle.y + "/" + angle.z + "/" + gValue.x + "/" + gValue.y + "/" + gValue.z + "/" + PosLa + "/" + PosLo);
+
+  String packet = String(PacketNumber + "/" + Temp + "/" + Pres + "/" + "gforces" + "/" + "angles" + "/" + time + "/" + "pos");
   Serial.println(packet);
   commsSerial.println(packet);
 
-  delay(1000); //dies when set lower than 1s, idk why. Try increasing data transfer rate in apc220 setup
+  smartDelay(1000); //dies when set lower than 1s, idk why. Try increasing data transfer rate in apc220 setup
 }
