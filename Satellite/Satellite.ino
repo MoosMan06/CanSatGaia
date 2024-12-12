@@ -1,3 +1,11 @@
+#include <SoftwareSerial.h>  //communication
+#include <Wire.h>            //more general sensors
+#include <SPI.h>             //no idea
+#include <Adafruit_Sensor.h> //sensors in general
+#include <Adafruit_BMP280.h> //temp/pressure sensor
+#include <MPU9250_WE.h>      //gyro
+#include <TinyGPS++.h>       //gps
+
 /*
 Arduino UNO wiring:
 
@@ -22,94 +30,193 @@ SDA/SDI <-> 11  (required, MOSI)
     ADS <-> A4  (required, hardcoded in library)
     ADO <-> GND (required, idk why)
     INI <-> 2   (required, hardcoded in library)
+
+  GY-GPSV3-NEO-M8N:
+    VCC <-> 5v
+    GND <-> GND
+     RX <-> 3
+     TX <-> 4
 */
 
-#include <SoftwareSerial.h>  //communication
-#include <Wire.h>            //more general sensors
-#include <SPI.h>             //no idea
-#include <Adafruit_Sensor.h> //sensors in general
-#include <Adafruit_BMP280.h> //temp/pressure sensor
-#include <MPU9250_WE.h>      //gyro
-#include <TinyGPS++.h>       //gps
-
-#define MPU9250_ADDR 0x68
+#define MPU9250_ADDRESS 0x68
 TinyGPSPlus gps;
-
-MPU9250_WE myMPU9250 = MPU9250_WE(MPU9250_ADDR);
+MPU9250_WE gyro = MPU9250_WE(MPU9250_ADDRESS);
 
 #define BMP_SCK 13
 #define BMP_MISO 12
 #define BMP_MOSI 11
 #define BMP_CS 10
 
-Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
-//apc220 config: 450000 2400 9 9600 0
+Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO, BMP_SCK);
+// apc220 config: 450000 2400 9 9600 0
 
 SoftwareSerial commsSerial(8, 7);
-SoftwareSerial gpsSerial(4, 3);
+SoftwareSerial GPSSerial(4, 3);
+
+static void printInt(unsigned long value, bool isValid, int amountOfCharacters);
+static void printFloat(float value, bool isValid, int amountOfCharacters, int amountOfDecimals);
+static void printTime(TinyGPSTime &t);
+static void smartDelay(unsigned long ms);
+static void printXYZ(xyzFloat values, int amountOfCharacters, int amountOfDecimals);
+
+static const int BAUD_RATE = 9600;
+static const int TIMEZONE = 1;
+
+void setup()
+{
+  Serial.begin(BAUD_RATE);      // begin serial communication
+  commsSerial.begin(BAUD_RATE); // begin communication with APC220
+  GPSSerial.begin(BAUD_RATE);   // begin communication with GPS
+  Wire.begin();            // begin communication with I2C sensors
+
+  Serial.println("Position you MPU9250 flat and don't move it - calibrating..."); // gyro calibration
+  smartDelay(1000);
+  gyro.autoOffsets();
+  Serial.println("Done!");
+  gyro.setAccRange(MPU9250_ACC_RANGE_8G); // set g range to 16G, options are 2G, 4G, 8G, 16G. Maybe tweak this later
+  gyro.enableAccDLPF(true);               // digital low pass filter to reduce noise
+  gyro.setAccDLPF(MPU9250_DLPF_6);        // also something with the low pass filter, see library example "MPU9250_angles_and_orientation" for further comments
+  bmp.begin();
+  gyro.init();
+}
+unsigned int packetNumber;
+float temp, pres;
+void loop()
+{
+  Serial.print(F("Packet: ")); // packet number
+  printInt(packetNumber++, true, 5);
+
+  Serial.print(F(" Temp: ")); // temperature in *C
+  printFloat(temp, bmp.begin(), 6, 2);
+
+  Serial.print(F(" Press: ")); // pressure in Pa
+  printFloat(pres, bmp.begin(), 8, 1);
+
+  Serial.print(F(" Angles: ")); // angle in degrees
+  printXYZ(gyro.getAngles(), 7, 2);
+
+  Serial.print(F(" Accel: ")); // acceleration in G
+  printXYZ(gyro.getGValues(), 6, 2);
+
+  Serial.print(F(" Time: ")); // time in hh:mm:ss
+  printTime(gps.time);
+
+  Serial.print(F(" Lat: ")); // latitude coordinate
+  printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
+
+  Serial.print(F(" Lng: ")); // longitude coordinate
+  printFloat(gps.location.lng(), gps.location.isValid(), 11, 6);
+
+  Serial.print(F(" Alt: ")); // altitude in meters
+  printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
+
+  Serial.print(F(" Age: ")); // time in ms since last valid data
+  printInt(gps.location.age(), gps.location.isValid(), 5);
+
+  Serial.print(F(" Error: ")); // Horizontal Dilution Of Precision, higher number means less confidence in horizontal position. 1-2 is very accurate, 
+  printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 5, 2); // 2-5 is good, 5-10 is kinda alright, 10-20 is very rough and anything above 20 is useless
+
+  Serial.print(F(" Sats: ")); // amount of satellites we are receiving data from
+  GPSSerial.print(F("Sats: "));
+  printInt(gps.satellites.value(), gps.satellites.isValid(), 2);
+
+
+  GPSSerial.println();
+  Serial.println();
+
+  if (millis() > 5000 && gps.charsProcessed() < 10)
+  {
+    Serial.println(F("No GPS data received: check wiring"));
+  }
+  else
+  {
+    smartDelay(1000);
+  }
+}
 
 static void smartDelay(unsigned long ms)
 {
   unsigned long start = millis();
-  do 
+  do
   {
-    while (gpsSerial.available())
-      gps.encode(gpsSerial.read());
+    temp = bmp.readTemperature();
+    pres = bmp.readPressure();
+    while (GPSSerial.available())
+      gps.encode(GPSSerial.read());
   } while (millis() - start < ms);
 }
 
-void setup() {
-  Serial.begin(9600);
-  commsSerial.begin(9600);
-  gpsSerial.begin(9600);
-  Wire.begin();
-
-  if(!myMPU9250.init()){
-    Serial.println("MPU9250 does not respond");
+static void printFloat(float value, bool isValid, int amountOfCharacters, int amountOfDecimals)
+{
+  if (!isValid)
+  {
+    while (amountOfCharacters-- > 1)
+    {
+      Serial.print('*');
+    }
+    GPSSerial.print('*');
+    Serial.print('*');
+    GPSSerial.print('*');
   }
-  else{
-    Serial.println("MPU9250 is connected");
+  else
+  {
+    Serial.print(value, amountOfDecimals);
+    int valueWithoutDecimals = abs((int)value);
+    int valueLength = amountOfDecimals + (value < 0.0 ? 2 : 1); // . and -
+    do
+    {
+      valueWithoutDecimals /= 10;
+      valueLength++;
+    } while (valueWithoutDecimals > 0);
+    for (int i = valueLength; i < amountOfCharacters; ++i)
+    {
+      Serial.print('_');
+    }
+    GPSSerial.print('_');
   }
-  Serial.println("Position you MPU9250 flat and don't move it - calibrating..."); //gyro calibration
-  smartDelay(1000);
-  myMPU9250.autoOffsets();
-  Serial.println("Done!");
-  myMPU9250.setAccRange(MPU9250_ACC_RANGE_2G);// can't measure more than 2G rn, calculate our max G forces later and change this to 4, 8 or 16G
-  myMPU9250.enableAccDLPF(true); //digital low pass filter to reduce noise
-  myMPU9250.setAccDLPF(MPU9250_DLPF_6);//also something with the low pass filter, see library example "MPU9250_angles_and_orientation" for further comments  
-
-  Serial.println(F("BMP280 test"));
-  if (!bmp.begin()) {  
-    Serial.println(F("Could not find a valid BMP280 sensor, check wiring!"));
-    while (1);
-  }
+  smartDelay(0);
 }
 
-int Number;
-float PosLo;
-float PosLa;
+static void printInt(unsigned long value, bool isValid, int amountOfCharacters)
+{
+  char output[32] = "*****************";
+  if (isValid)
+    snprintf(output, sizeof(output), "%lu", value);
+  output[amountOfCharacters] = 0;
+  for (int i = strlen(output); i < amountOfCharacters; ++i)
+    output[i] = '_';
+  Serial.print(output);
+  GPSSerial.print(output);
+  smartDelay(0);
+}
 
-void loop() {  
-  Number++;
-  String PacketNumber = String(Number); //string conversion magic is currently untested
+static void printTime(TinyGPSTime &time)
+{
+  if (!time.isValid())
+  {
+    Serial.print(F("********"));
+    GPSSerial.print(F("********"));
+  }
+  else
+  {
+    char output[32];
+    snprintf(output, sizeof(output), "%02d:%02d:%02d", time.hour() + TIMEZONE, time.minute(), time.second());
+    Serial.print(output);
+    snprintf(output, sizeof(output), "%02d_%02d_%02d", time.hour() + TIMEZONE, time.minute(), time.second());
+    GPSSerial.print(output);
+  }
+  smartDelay(0);
+}
 
-  String hour = String(TinyGPSTime.hour);
-  String mins = String(TinyGPSTime.minute);
-  String secs = String(TinyGPSTime.second);
+static void printXYZ(xyzFloat values, int amountOfCharacters, int amountOfDecimals)
+{
+  printFloat(values.x, true, amountOfCharacters, amountOfDecimals);
+  Serial.print("/");
+  GPSSerial.print("_");
+  printFloat(values.y, true, amountOfCharacters, amountOfDecimals);
+  Serial.print("/");
+  GPSSerial.print("_");
+  printFloat(values.z, true, amountOfCharacters, amountOfDecimals);
 
-
-  String time = String(hour + ":" + mins + ":" + secs); //time
-//  String pos = String(gps.location.lat() ":" gps.location.lng());
-
-//  String gforces = String(myMPU9250.getGValues().x + ":" + myMPU9250.getGValues().y + ":" + myMPU9250.getGValues().z); // g forces
-//  String angles = String(myMPU9250.getAngles().x + ":" + myMPU9250.getAngles().y + ":" + myMPU9250.getAngles().z); // angles in degrees
-
-  float Temp = bmp.readTemperature(); // temperature in *C
-  float Pres = bmp.readPressure(); // pressure in Pa
-
-  String packet = String(PacketNumber + "/" + Temp + "/" + Pres + "/" + "gforces" + "/" + "angles" + "/" + time + "/" + "pos");
-  Serial.println(packet);
-  commsSerial.println(packet);
-
-  smartDelay(1000); //dies when set lower than 1s, idk why. Try increasing data transfer rate in apc220 setup
+  smartDelay(0);
 }
