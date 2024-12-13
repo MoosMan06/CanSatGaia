@@ -117,11 +117,17 @@ void loop()
   printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 5, 2); // 2-5 is good, 5-10 is kinda alright, 10-20 is very rough and anything above 20 is useless
 
   Serial.print(F(" Sats: ")); // amount of satellites we are receiving data from
-  GPSSerial.print(F("Sats: "));
   printInt(gps.satellites.value(), gps.satellites.isValid(), 2);
 
+  unsigned long passed = gps.passedChecksum();
+  unsigned long failed = gps.failedChecksum();
+  unsigned long total = passed + failed;
+  float successPercentage = (passed / (float)total) * 100.0;
 
-  GPSSerial.println();
+  Serial.print(F(" Fail%: "));
+  printFloat(successPercentage, true, 5, 1);
+
+  commsSerial.println();
   Serial.println();
 
   if (millis() > 5000 && gps.charsProcessed() < 10)
@@ -153,14 +159,15 @@ static void printFloat(float value, bool isValid, int amountOfCharacters, int am
     while (amountOfCharacters-- > 1)
     {
       Serial.print('*');
+      commsSerial.print('*');
     }
-    GPSSerial.print('*');
     Serial.print('*');
-    GPSSerial.print('*');
+    commsSerial.print('*');
   }
   else
   {
     Serial.print(value, amountOfDecimals);
+    commsSerial.print(value, amountOfDecimals);
     int valueWithoutDecimals = abs((int)value);
     int valueLength = amountOfDecimals + (value < 0.0 ? 2 : 1); // . and -
     do
@@ -171,8 +178,8 @@ static void printFloat(float value, bool isValid, int amountOfCharacters, int am
     for (int i = valueLength; i < amountOfCharacters; ++i)
     {
       Serial.print('_');
+      commsSerial.print('_');
     }
-    GPSSerial.print('_');
   }
   smartDelay(0);
 }
@@ -186,7 +193,7 @@ static void printInt(unsigned long value, bool isValid, int amountOfCharacters)
   for (int i = strlen(output); i < amountOfCharacters; ++i)
     output[i] = '_';
   Serial.print(output);
-  GPSSerial.print(output);
+  commsSerial.print(output);
   smartDelay(0);
 }
 
@@ -195,7 +202,7 @@ static void printTime(TinyGPSTime &time)
   if (!time.isValid())
   {
     Serial.print(F("********"));
-    GPSSerial.print(F("********"));
+    commsSerial.print(F("********"));
   }
   else
   {
@@ -203,7 +210,7 @@ static void printTime(TinyGPSTime &time)
     snprintf(output, sizeof(output), "%02d:%02d:%02d", time.hour() + TIMEZONE, time.minute(), time.second());
     Serial.print(output);
     snprintf(output, sizeof(output), "%02d_%02d_%02d", time.hour() + TIMEZONE, time.minute(), time.second());
-    GPSSerial.print(output);
+    commsSerial.print(output);
   }
   smartDelay(0);
 }
@@ -212,10 +219,10 @@ static void printXYZ(xyzFloat values, int amountOfCharacters, int amountOfDecima
 {
   printFloat(values.x, true, amountOfCharacters, amountOfDecimals);
   Serial.print("/");
-  GPSSerial.print("_");
+  commsSerial.print("_");
   printFloat(values.y, true, amountOfCharacters, amountOfDecimals);
   Serial.print("/");
-  GPSSerial.print("_");
+  commsSerial.print("_");
   printFloat(values.z, true, amountOfCharacters, amountOfDecimals);
 
   smartDelay(0);
