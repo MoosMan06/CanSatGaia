@@ -1,0 +1,141 @@
+\documentclass[a4paper]{article}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern,longtable,booktabs,array,url,xurl,hyperref, parskip}
+%\hypersetup{hidelinks}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+\title{GROUND Communications Protocol Specification\\ \large Version 1.1}
+\date{\today}
+\author{B.B.F.M. Verspaandonk}
+
+\begin{document}
+
+\maketitle
+
+\section*{Overview}
+The GROUND (GAIA Radio OUtput Network Delivery) protocol is designed for transmitting data from the Cansat to the ground station. All data is serialized in little-endian format, meaning the least significant byte is sent first. For example, the number \texttt{0x1234} would be transmitted as \texttt{0x34 0x12}.
+
+\section*{Packet Structure}
+A packet comprises the following fields:
+\begin{longtable}{@{}lll@{}}
+\toprule
+\# & Field Name         & Size                \\
+\midrule
+1  & \texttt{magic}      & 4 bytes             \\
+2  & \texttt{content\_type} & 2 bytes             \\
+3  & \texttt{content\_size} & 2 bytes             \\
+4  & \texttt{content}     & \texttt{content\_size} bytes \\
+\bottomrule
+\end{longtable}
+
+\subsection*{Field Descriptions}
+\textbf{\texttt{magic}}: A constant value \texttt{0x47414941} (ASCII for \texttt{GAIA}) that marks the start of a packet.
+
+\textbf{\texttt{content\_type}}: Specifies the type and structure of the data. Its two bytes are interpreted as follows:
+\begin{itemize}
+  \item \textbf{First byte}:
+  \begin{itemize}
+    \item High nibble (\texttt{0xF0}): Indicates if the content includes a CRC checksum (\texttt{0x0} = no, \texttt{0x1} = yes).
+    \item Low nibble (\texttt{0x0F}): Specifies the data category  (see \hyperref[data-types]{Data Types}). May never be \texttt{0x0}.
+  \end{itemize}
+  \item \textbf{Second byte}:
+  \begin{itemize}
+    \item High nibble (\texttt{0xF0}): Indicates whether the data is a single value (\texttt{0x0}) or an array (\texttt{0x1}).
+    \item Low nibble (\texttt{0x0F}): Specifies the data's primitive type (see \hyperref[data-types]{Data Types}).
+  \end{itemize}
+\end{itemize}
+
+\textbf{\texttt{content\_size}}: The number of bytes in the \texttt{content} field.
+
+\textbf{\texttt{content}}: The actual data payload. Its interpretation depends on \texttt{content\_type}.
+
+\section*{Handling \texttt{magic} in Content}
+If the \texttt{magic} sequence \texttt{0x47414941} appears in the \texttt{content}, it must be escaped by appending a \texttt{0x00} byte immediately after. For example:
+
+\texttt{47 41 49 41 }\textrightarrow\texttt{ 47 41 49 41 00}
+
+The escape byte contributes to \texttt{content\_size} but is excluded from array length calculations. It should be removed during packet parsing.
+
+\section*{Data Types}\label{data-types}
+\subsection*{Raw Data Types}
+\begin{longtable}{@{}lll@{}}
+\toprule
+Value    & Type             & Description                  \\
+\midrule
+\texttt{0x00} & \texttt{u8}       & Unsigned 8-bit integer       \\
+\texttt{0x01} & \texttt{u16}      & Unsigned 16-bit integer      \\
+\texttt{0x02} & \texttt{u32}      & Unsigned 32-bit integer      \\
+\texttt{0x03} & \texttt{u64}      & Unsigned 64-bit integer      \\
+\texttt{0x04} & \texttt{s8}       & Signed 8-bit integer         \\
+\texttt{0x05} & \texttt{s16}      & Signed 16-bit integer        \\
+\texttt{0x06} & \texttt{s32}      & Signed 32-bit integer        \\
+\texttt{0x07} & \texttt{s64}      & Signed 64-bit integer        \\
+\texttt{0x08} & \texttt{float}    & 32-bit floating point number \\
+\texttt{0x09} & \texttt{double}   & 64-bit floating point number \\
+\texttt{0x0A} & \texttt{bool}     & Boolean                      \\
+\texttt{0x0B} & \texttt{char}     & ASCII character              \\
+\bottomrule
+\end{longtable}
+
+\subsection*{Categorical Data Types}
+\begin{longtable}{@{}lll@{}}
+\toprule
+Value    & Type             & Description                  \\
+\midrule
+\texttt{0x01} & \texttt{GPS}        & GPS coordinates              \\
+\texttt{0x02} & \texttt{G-force}    & G-force measurement          \\
+\texttt{0x03} & \texttt{Angle}      & Angle measurement            \\
+\texttt{0x04} & \texttt{Time}       & GPS Time                     \\
+\texttt{0x05} & \texttt{Age}        & Time in ms since last gps fix\\
+\bottomrule
+\end{longtable}
+
+\section*{Examples}
+\subsection*{Single Value}
+Packet encoding a single unsigned 16-bit integer with value \texttt{4660}:
+\begin{verbatim}
+47 41 49 41 21 01 02 00 34 12
+\end{verbatim}
+\textbf{Breakdown:}
+\begin{verbatim}
+47 41 49 41 // Magic number
+21          // Content type: Unsigned 16-bit integer
+02 00       // Content size: 2 bytes
+34 12       // Content: 4660
+\end{verbatim}
+
+\subsection*{Array}
+Packet encoding GPS coordinates (latitude, longitude) as two 64-bit doubles:
+\begin{verbatim}
+  47 41 49 41 11 19 11 00 8C 01 E2 36 9D B4 49 40 1B F1 90 7B 96 F4 15 40 6D
+\end{verbatim}
+\textbf{Breakdown:}
+\begin{verbatim}
+  47 41 49 41             // Magic number
+  11                      // Content category: GPS coordinates with CRC
+  19                      // Content type: Array of 64-bit doubles
+  10 00                   // Content size: 17 bytes
+  1F 8B 8C 0C F4 B6 49 40 // Latitude: 51.411047802309525
+  77 05 98 4A 64 D4 15 40 // Longitude: 5.488855295869395
+  6D                      // CRC-8 checksum
+\end{verbatim}
+
+\subsection*{Escaped Magic Number}
+GPS coordinates with a \texttt{magic} sequence in the content:
+\begin{verbatim}
+  47 41 49 41 11 19 12 00 47 41 49 41 00 F8 B6 49 40 10 61 4A 8F 35 D4 15 40 6D
+\end{verbatim}
+\textbf{Breakdown:}
+\begin{verbatim}
+  47 41 49 41                // Magic number
+  11                         // Content category: GPS coordinates with CRC
+  19                         // Content type: Array of 64-bit doubles
+  12 00                      // Content size: 17 bytes
+  47 41 49 41 00 F8 B6 49 40 // Latitude: 51.429451142090834 (with escaped magic number)
+  10 61 4A 8F 35 D4 15 40    // Longitude: 5.457235564150565
+  6D                         // CRC-8 checksum
+\end{verbatim}
+
+\end{document}
