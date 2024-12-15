@@ -2,11 +2,23 @@
 \usepackage{xcolor}
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb}
-\usepackage{lmodern,longtable,booktabs,array,url,xurl,hyperref, parskip}
+\usepackage{lmodern,longtable,booktabs,array,url,xurl,hyperref,parskip}
+\usepackage{lastpage}
+\usepackage{fancyhdr}
+
+\fancypagestyle{plain}{
+	\fancyhf{}
+	\fancyhead[L]{B.B.F.M. Verspaandonk}
+	\fancyhead[R]{Cansat GAIA}
+	\fancyfoot[C]{GROUND Communications Protocol\hfill Page \thepage\ of \pageref{LastPage}}
+}
+\pagestyle{plain}
+\renewcommand{\footrulewidth}{0.4pt}
+
 %\hypersetup{hidelinks}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 
-\title{GROUND Communications Protocol Specification\\ \large Version 1.2}
+\title{GROUND Communications Protocol Specification\\ \large Version 1.2.1}
 \date{\today}
 \author{B.B.F.M. Verspaandonk}
 
@@ -23,7 +35,7 @@ A packet comprises the following fields:
 \toprule
 \# & Field Name         & Size                \\
 \midrule
-1  & \texttt{magic}      & 4 bytes             \\
+1  & \texttt{magic\_number}      & 4 bytes             \\
 2  & \texttt{content\_type} & 2 bytes             \\
 3  & \texttt{content\_size} & 2 bytes             \\
 4  & \texttt{content}     & \texttt{content\_size} bytes \\
@@ -31,7 +43,7 @@ A packet comprises the following fields:
 \end{longtable}
 
 \subsection*{Field Descriptions}
-\textbf{\texttt{magic}}: A constant value \texttt{0x47414941} (ASCII for \texttt{GAIA}) that marks the start of a packet.
+\textbf{\texttt{magic\_number}}: A constant value \texttt{0x47414941} (ASCII for \texttt{GAIA}) that marks the start of a packet.
 
 \textbf{\texttt{content\_type}}: Specifies the type and structure of the data. Its two bytes are interpreted as follows:
 \begin{itemize}
@@ -51,8 +63,8 @@ A packet comprises the following fields:
 
 \textbf{\texttt{content}}: The actual data payload. Its interpretation depends on \texttt{content\_type}.
 
-\section*{Handling \texttt{magic} in Content}
-If the \texttt{magic} sequence \texttt{0x47414941} appears in the \texttt{content}, it must be escaped by appending a \texttt{0x00} byte immediately after. For example:
+\section*{Handling \texttt{magic\_number} in Content}
+If the \texttt{magic\_number} sequence \texttt{0x47414941} appears in the \texttt{content}, it must be escaped by appending a \texttt{0x00} byte immediately after. For example:
 
 \texttt{47 41 49 41 }\textrightarrow\texttt{ 47 41 49 41 00}
 
@@ -176,7 +188,7 @@ Packet encoding GPS coordinates (latitude, longitude) as two 64-bit doubles:
 \end{verbatim}
 
 \subsection*{Escaped Magic Number}
-GPS coordinates with a \texttt{magic} sequence in the content:
+GPS coordinates with a \texttt{magic\_number} sequence in the content:
 \begin{verbatim}
   47 41 49 41 21 19 13 00 47 41 49 41 00 F8 B6 49 40 10 61 4A 8F 35 D4 15 40 82 E8
 \end{verbatim}
