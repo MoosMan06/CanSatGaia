@@ -6,7 +6,7 @@
 %\hypersetup{hidelinks}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 
-\title{GROUND Communications Protocol Specification\\ \large Version 1.1}
+\title{GROUND Communications Protocol Specification\\ \large Version 1.2}
 \date{\today}
 \author{B.B.F.M. Verspaandonk}
 
@@ -37,7 +37,7 @@ A packet comprises the following fields:
 \begin{itemize}
   \item \textbf{First byte}:
   \begin{itemize}
-    \item High nibble (\texttt{0xF0}): Indicates if the content includes a CRC checksum (\texttt{0x0} = no, \texttt{0x1} = yes).
+    \item High nibble (\texttt{0xF0}): Indicates which CRC checksum is included (\texttt{0x0} = none, \texttt{0x1} = CRC-8, \texttt{0x2} = CRC-16-IBM, \texttt{0x3} = CRC-32-ISO-HDLC. See \hyperref[checksums]{Checksums}).
     \item Low nibble (\texttt{0x0F}): Specifies the data category  (see \hyperref[data-types]{Data Types}). May never be \texttt{0x0}.
   \end{itemize}
   \item \textbf{Second byte}:
@@ -84,13 +84,66 @@ Value    & Type             & Description                  \\
 \toprule
 Value    & Type             & Description                  \\
 \midrule
-\texttt{0x01} & \texttt{GPS}        & GPS coordinates              \\
-\texttt{0x02} & \texttt{G-force}    & G-force measurement          \\
-\texttt{0x03} & \texttt{Angle}      & Angle measurement            \\
-\texttt{0x04} & \texttt{Time}       & GPS Time                     \\
-\texttt{0x05} & \texttt{Age}        & Time in ms since last gps fix\\
+\texttt{0x01} & \texttt{GPS}        & GPS coordinates                  \\
+\texttt{0x02} & \texttt{G-force}    & G-force measurement              \\
+\texttt{0x03} & \texttt{Angle}      & Angle measurement                \\
+\texttt{0x04} & \texttt{Time}       & GPS Time                         \\
+\texttt{0x05} & \texttt{Age}        & Time in ms since last gps fix    \\
+\texttt{0x06} & \texttt{HDOP}       & Horizontal Dilution of Precision \\
+\texttt{0x07} & \texttt{Satellites} & Number of satellites in view     \\
+\texttt{0x08} & \texttt{GPS Fail \%}& Percentage of GPS cheksums failed\\
+\texttt{0x09} & \texttt{CO2}*       & CO$_2$ concentration in ppb      \\
+\texttt{0x0A} & \texttt{Temperature}& Temperature in $^\circ$C         \\
+\texttt{0x0B} & \texttt{Pressure}   & Pressure in Pa                   \\
+\texttt{0x0C} & \texttt{Dust}*      & Dust concentration in idk what   \\
+\texttt{0x0D} & \texttt{UV}*        & UV radiation in idk what         \\
+\texttt{0x0E} & \texttt{Packet}     & Packet number                    \\
 \bottomrule
 \end{longtable}
+* These sensors may not be present on the final Cansat.
+
+\section*{Checksums}\label{checksums}
+The checksum nibble can take on the following values:
+\begin{longtable}{@{}ll@{}}
+\toprule
+Value    & Checksum Type     \\
+\midrule
+\texttt{0x0} & None              \\
+\texttt{0x1} & CRC-8             \\
+\texttt{0x2} & CRC-16-IBM        \\
+\texttt{0x3} & CRC-32-ISO-HDLC   \\
+\bottomrule
+\end{longtable}
+
+\subsection*{CRC-8}
+The following fields are used for calculating the CRC-8 checksum:
+\begin{itemize}
+  \item Polynomial: \texttt{0x07}
+  \item Initial value: \texttt{0x00}
+  \item Final XOR value: \texttt{0x00}
+  \item Reverse input: \texttt{false}
+  \item Reverse output: \texttt{false}
+\end{itemize}
+
+\subsection*{CRC-16-IBM}
+The following fields are used for calculating the CRC-16-IBM checksum:
+\begin{itemize}
+  \item Polynomial: \texttt{0x8005}
+  \item Initial value: \texttt{0x0000}
+  \item Final XOR value: \texttt{0x0000}
+  \item Reverse input: \texttt{true}
+  \item Reverse output: \texttt{true}
+\end{itemize}
+
+\subsection*{CRC-32-ISO-HDLC}
+The following fields are used for calculating the CRC-32-ISO-HDLC checksum:
+\begin{itemize}
+  \item Polynomial: \texttt{0x04C11DB7}
+  \item Initial value: \texttt{0xFFFFFFFF}
+  \item Final XOR value: \texttt{0xFFFFFFFF}
+  \item Reverse input: \texttt{true}
+  \item Reverse output: \texttt{true}
+\end{itemize}
 
 \section*{Examples}
 \subsection*{Single Value}
@@ -114,7 +167,7 @@ Packet encoding GPS coordinates (latitude, longitude) as two 64-bit doubles:
 \textbf{Breakdown:}
 \begin{verbatim}
   47 41 49 41             // Magic number
-  11                      // Content category: GPS coordinates with CRC
+  11                      // Content category: GPS coordinates with CRC-8
   19                      // Content type: Array of 64-bit doubles
   10 00                   // Content size: 17 bytes
   1F 8B 8C 0C F4 B6 49 40 // Latitude: 51.411047802309525
@@ -125,17 +178,17 @@ Packet encoding GPS coordinates (latitude, longitude) as two 64-bit doubles:
 \subsection*{Escaped Magic Number}
 GPS coordinates with a \texttt{magic} sequence in the content:
 \begin{verbatim}
-  47 41 49 41 11 19 12 00 47 41 49 41 00 F8 B6 49 40 10 61 4A 8F 35 D4 15 40 6D
+  47 41 49 41 21 19 13 00 47 41 49 41 00 F8 B6 49 40 10 61 4A 8F 35 D4 15 40 82 E8
 \end{verbatim}
 \textbf{Breakdown:}
 \begin{verbatim}
   47 41 49 41                // Magic number
-  11                         // Content category: GPS coordinates with CRC
+  21                         // Content category: GPS coordinates with CRC-16
   19                         // Content type: Array of 64-bit doubles
-  12 00                      // Content size: 17 bytes
+  13 00                      // Content size: 17 bytes
   47 41 49 41 00 F8 B6 49 40 // Latitude: 51.429451142090834 (with escaped magic number)
   10 61 4A 8F 35 D4 15 40    // Longitude: 5.457235564150565
-  6D                         // CRC-8 checksum
+  82 E8                      // CRC-16-IBM checksum
 \end{verbatim}
 
 \end{document}
