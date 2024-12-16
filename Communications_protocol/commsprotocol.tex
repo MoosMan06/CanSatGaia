@@ -19,7 +19,7 @@
 %\hypersetup{hidelinks}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 
-\title{GROUND Communications Protocol Specification\\ \large Version 1.2.3}
+\title{GROUND Communications Protocol Specification\\ \large Version 1.3.0}
 \date{\today}
 \author{B.B.F.M. Verspaandonk}
 
@@ -42,6 +42,7 @@ A packet comprises the following fields:
 2  & \texttt{content\_type} & 2 bytes             \\
 3  & \texttt{content\_size} & 2 bytes             \\
 4  & \texttt{content}     & \texttt{content\_size} bytes \\
+5  & \texttt{checksum}    & 1, 2, or 4 bytes      \\
 \bottomrule
 \end{longtable}
 
@@ -52,7 +53,7 @@ A packet comprises the following fields:
 \begin{itemize}
   \item \textbf{First byte}:
   \begin{itemize}
-    \item High nibble (\texttt{0xF0}): Indicates which CRC checksum is included (\texttt{0x0} = none, \texttt{0x1} = CRC-8, \texttt{0x2} = CRC-16-IBM, \texttt{0x3} = CRC-32-ISO-HDLC. See \hyperref[checksums]{Checksums}).
+    \item High nibble (\texttt{0xF0}): Indicates which CRC checksum is included (\texttt{0x0} = none, \texttt{0x1} = CRC-8, \texttt{0x2} = CRC-16-IBM, \texttt{0x4} = CRC-32-ISO-HDLC. See \hyperref[checksums]{Checksums}).
     \item Low nibble (\texttt{0x0F}): Specifies the data category  (see \hyperref[data-types]{Data Types}). May never be \texttt{0x0}.
   \end{itemize}
   \item \textbf{Second byte}:
@@ -126,7 +127,7 @@ Value    & Checksum Type     \\
 \texttt{0x0} & None              \\
 \texttt{0x1} & CRC-8             \\
 \texttt{0x2} & CRC-16-IBM        \\
-\texttt{0x3} & CRC-32-ISO-HDLC   \\
+\texttt{0x4} & CRC-32-ISO-HDLC   \\
 \bottomrule
 \end{longtable}
 
