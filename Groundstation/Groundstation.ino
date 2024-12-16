@@ -1,8 +1,9 @@
-#include <SoftwareSerial.h>
-
 //apc220 config: 450000 2400 9 9600 0
 
-SoftwareSerial mySerial(10, 11);
+#include <Arduino.h>
+#include <SoftwareSerial.h>
+
+SoftwareSerial mySerial(10, 11); // RX, TX
 
 void setup() {
   Serial.begin(9600);
@@ -11,8 +12,8 @@ void setup() {
 
 void loop() {
   if (mySerial.available()) {
-    String input = mySerial.readString();
-    Serial.println(input);
+    byte receivedByte = mySerial.read();
+    Serial.print(receivedByte, HEX);
+    Serial.print(",");
   }
-  delay(1);
 }
