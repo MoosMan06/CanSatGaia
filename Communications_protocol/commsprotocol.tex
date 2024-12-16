@@ -5,6 +5,7 @@
 \usepackage{lmodern,longtable,booktabs,array,url,xurl,hyperref,parskip}
 \usepackage{lastpage}
 \usepackage{fancyhdr}
+\setcounter{secnumdepth}{1}
 
 \fancypagestyle{plain}{
 	\fancyhf{}
@@ -18,7 +19,7 @@
 %\hypersetup{hidelinks}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 
-\title{GROUND Communications Protocol Specification\\ \large Version 1.2.1}
+\title{GROUND Communications Protocol Specification\\ \large Version 1.2.2}
 \date{\today}
 \author{B.B.F.M. Verspaandonk}
 
@@ -26,10 +27,12 @@
 
 \maketitle
 
-\section*{Overview}
+\tableofcontents
+
+\section{Overview}
 The GROUND (GAIA Radio OUtput Network Delivery) protocol is designed for transmitting data from the Cansat to the ground station. All data is serialized in little-endian format, meaning the least significant byte is sent first. For example, the number \texttt{0x1234} would be transmitted as \texttt{0x34 0x12}.
 
-\section*{Packet Structure}
+\section{Packet Structure}
 A packet comprises the following fields:
 \begin{longtable}{@{}lll@{}}
 \toprule
@@ -42,7 +45,7 @@ A packet comprises the following fields:
 \bottomrule
 \end{longtable}
 
-\subsection*{Field Descriptions}
+\subsection{Field Descriptions}
 \textbf{\texttt{magic\_number}}: A constant value \texttt{0x47414941} (ASCII for \texttt{GAIA}) that marks the start of a packet.
 
 \textbf{\texttt{content\_type}}: Specifies the type and structure of the data. Its two bytes are interpreted as follows:
@@ -63,15 +66,15 @@ A packet comprises the following fields:
 
 \textbf{\texttt{content}}: The actual data payload. Its interpretation depends on \texttt{content\_type}.
 
-\section*{Handling \texttt{magic\_number} in Content}
+\section{Handling \texttt{magic\_number} in Content}
 If the \texttt{magic\_number} sequence \texttt{0x47414941} appears in the \texttt{content}, it must be escaped by appending a \texttt{0x00} byte immediately after. For example:
 
 \texttt{47 41 49 41 }\textrightarrow\texttt{ 47 41 49 41 00}
 
 The escape byte contributes to \texttt{content\_size} but is excluded from array length calculations. It should be removed during packet parsing.
 
-\section*{Data Types}\label{data-types}
-\subsection*{Raw Data Types}
+\section{Data Types}\label{data-types}
+\subsection{Raw Data Types}
 \begin{longtable}{@{}lll@{}}
 \toprule
 Value    & Type             & Description                  \\
@@ -91,7 +94,7 @@ Value    & Type             & Description                  \\
 \bottomrule
 \end{longtable}
 
-\subsection*{Categorical Data Types}
+\subsection{Categorical Data Types}
 \begin{longtable}{@{}lll@{}}
 \toprule
 Value    & Type             & Description                  \\
@@ -114,7 +117,7 @@ Value    & Type             & Description                  \\
 \end{longtable}
 * These sensors may not be present on the final Cansat.
 
-\section*{Checksums}\label{checksums}
+\section{Checksums}\label{checksums}
 The checksum nibble can take on the following values:
 \begin{longtable}{@{}ll@{}}
 \toprule
@@ -127,7 +130,7 @@ Value    & Checksum Type     \\
 \bottomrule
 \end{longtable}
 
-\subsection*{CRC-8}
+\subsection{CRC-8}
 The following fields are used for calculating the CRC-8 checksum:
 \begin{itemize}
   \item Polynomial: \texttt{0x07}
@@ -137,7 +140,7 @@ The following fields are used for calculating the CRC-8 checksum:
   \item Reverse output: \texttt{false}
 \end{itemize}
 
-\subsection*{CRC-16-IBM}
+\subsection{CRC-16-IBM}
 The following fields are used for calculating the CRC-16-IBM checksum:
 \begin{itemize}
   \item Polynomial: \texttt{0x8005}
@@ -147,7 +150,7 @@ The following fields are used for calculating the CRC-16-IBM checksum:
   \item Reverse output: \texttt{true}
 \end{itemize}
 
-\subsection*{CRC-32-ISO-HDLC}
+\subsection{CRC-32-ISO-HDLC}
 The following fields are used for calculating the CRC-32-ISO-HDLC checksum:
 \begin{itemize}
   \item Polynomial: \texttt{0x04C11DB7}
@@ -157,11 +160,21 @@ The following fields are used for calculating the CRC-32-ISO-HDLC checksum:
   \item Reverse output: \texttt{true}
 \end{itemize}
 
-\section*{Examples}
-\subsection*{Single Value}
+\section{Encoding order}
+The fields in a packet are encoded in the following order:
+\begin{enumerate}
+  \item Check if the \texttt{magic\_number} sequence appears in the \texttt{content} field. If so, escape it.
+  \item Calculate the content size and add 1, 2 or 4 bytes for the checksum.
+  \item Add the \texttt{magic\_number} sequence, \texttt{content\_type}, \texttt{content\_size} and \texttt{content} fields.
+  \item Calculate the checksum and append it to the packet.
+  \item Transmit the packet.
+\end{enumerate}
+
+\section{Examples}
+\subsection{Single Value}
 Packet encoding a single unsigned 16-bit integer with value \texttt{4660}:
 \begin{verbatim}
-47 41 49 41 21 01 02 00 34 12
+47 41 49 41 01 01 02 00 34 12
 \end{verbatim}
 \textbf{Breakdown:}
 \begin{verbatim}
@@ -171,7 +184,7 @@ Packet encoding a single unsigned 16-bit integer with value \texttt{4660}:
 34 12       // Content: 4660
 \end{verbatim}
 
-\subsection*{Array}
+\subsection{Array}
 Packet encoding GPS coordinates (latitude, longitude) as two 64-bit doubles:
 \begin{verbatim}
   47 41 49 41 11 19 11 00 8C 01 E2 36 9D B4 49 40 1B F1 90 7B 96 F4 15 40 6D
@@ -187,7 +200,7 @@ Packet encoding GPS coordinates (latitude, longitude) as two 64-bit doubles:
   6D                      // CRC-8 checksum
 \end{verbatim}
 
-\subsection*{Escaped Magic Number}
+\subsection{Escaped Magic Number}
 GPS coordinates with a \texttt{magic\_number} sequence in the content:
 \begin{verbatim}
   47 41 49 41 21 19 13 00 47 41 49 41 00 F8 B6 49 40 10 61 4A 8F 35 D4 15 40 82 E8
