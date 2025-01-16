@@ -72,7 +72,7 @@ ML8511 UVSensor(UVPIN);
 MPU6500_WE gyro = MPU6500_WE(MPU6500_ADDR);
 Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO, BMP_SCK);
 
-// apc220 config: 450000 2400 9 9600 0
+// apc220 config: w 432600 1 9 3 0
 SoftwareSerial commsSerial(8, 7);
 SoftwareSerial GPSSerial(4, 3);
 
