@@ -170,7 +170,7 @@ void loop()
     Serial.print(F(" Age: ")); // time in ms since last valid data
     printInt(gps.location.age(), gps.location.isValid(), 5);
 
-    Serial.print(F(" Error: "));                           // Horizontal Dilution Of Precision, higher number means less confidence in horizontal position. 1-2 is very accurate,
+    Serial.print(F(" Location innacuracy: "));             // Horizontal Dilution Of Precision, higher number means less confidence in horizontal position. 1-2 is very accurate,
     printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 5, 2); // 2-5 is good, 5-10 is kinda alright, 10-20 is very rough and anything above 20 is useless
 
     Serial.print(F(" Sats: ")); // amount of satellites we are receiving data from
@@ -181,7 +181,7 @@ void loop()
     unsigned long total = passed + failed;
     float successPercentage = (passed / (float)total) * 100.0;
 
-    Serial.print(F(" Fail%: "));
+    Serial.print(F(" GPS Succes%: "));
     printFloat(successPercentage, true, 5, 1);
 
     Serial.println();
