@@ -127,7 +127,7 @@ SoftwareSerial GPSSerial(4, 3);
 // other constants
 static const int DEBUG = true;
 
-static const int BAUD_RATE = 9600;
+static const int BAUD_RATE = 19200;
 static const int TIMEZONE = 1;
 static const int DUST_SAMPLING_TIME = 280;
 static const int DUST_DELTA_TIME = 40;
@@ -174,6 +174,7 @@ void sendPacket(T data, byte category, byte subCategory, byte dataType, byte che
     for (uint16_t k = 0; k < 8 + contentSize; k++) // 8 cuz header is 8 bytes long
     {
         commsSerial.write(packet[k]);
+//        Serial.print(" Y ");
     }
 }
 
@@ -320,66 +321,64 @@ void setup()
 
 void loop()
 {
-    Serial.print(F("Packet: ")); // packet number
-    printInt(packetNumber++, true, 5);
+//    Serial.print(F("Packet: ")); // packet number
+//    printInt(packetNumber++, true, 5);
     sendPacket(packetNumber, PACKET_NUM, NO_DIRECTION, U_INT_16, NO_CHECKSUM);
 
-    Serial.print(F(" Temp: ")); // temperature in *C
-    printFloat(bmp.readTemperature(), bmp.begin(), 6, 2);
+//    Serial.print(F(" Temp: ")); // temperature in *C
+//    printFloat(bmp.readTemperature(), bmp.begin(), 6, 2);
     sendPacket(bmp.readTemperature(), TEMPERATURE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" Press: ")); // pressure in Pa
-    printFloat(bmp.readPressure(), bmp.begin(), 8, 1);
+//    Serial.print(F(" Press: ")); // pressure in Pa
+//    printFloat(bmp.readPressure(), bmp.begin(), 8, 1);
     sendPacket(bmp.readPressure(), PRESSURE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" Angles: ")); // angle in degrees
-    printXYZ(gyro.getAngles(), gyro.init(), 7, 2);
+//    Serial.print(F(" Angles: ")); // angle in degrees
+//    printXYZ(gyro.getAngles(), gyro.init(), 7, 2);
     sendPacket(gyro.getAngles().x, ROTATION, DIRECTION_X, FLOAT, NO_CHECKSUM);
     sendPacket(gyro.getAngles().y, ROTATION, DIRECTION_Y, FLOAT, NO_CHECKSUM);
     sendPacket(gyro.getAngles().z, ROTATION, DIRECTION_Z, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" Accel: ")); // acceleration in G
-    printXYZ(gyro.getGValues(), gyro.init(), 6, 2);
+//    Serial.print(F(" Accel: ")); // acceleration in G
+//    printXYZ(gyro.getGValues(), gyro.init(), 6, 2);
     sendPacket(gyro.getGValues().x, G_FORCES, DIRECTION_X, FLOAT, NO_CHECKSUM);
     sendPacket(gyro.getGValues().y, G_FORCES, DIRECTION_Y, FLOAT, NO_CHECKSUM);
     sendPacket(gyro.getGValues().z, G_FORCES, DIRECTION_Z, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" UV: ")); // UV light intensity in mW/cm^2
-    printFloat(UVSensor.getUV(), UVSensor.isEnabled(), 6, 2);
+//    Serial.print(F(" UV: ")); // UV light intensity in mW/cm^2
+//    printFloat(UVSensor.getUV(), UVSensor.isEnabled(), 6, 2);
     sendPacket(UVSensor.getUV(), UV_RADIATON, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" Dust: ")); // dust density in ug/m^3
-    printFloat(getDustDensity(), true, 6, 2);
+//    Serial.print(F(" Dust: ")); // dust density in ug/m^3
+//    printFloat(getDustDensity(), true, 6, 2);
     sendPacket(getDustDensity(), DUST_CONCENTRATION, NO_DIRECTION, U_INT_16, NO_CHECKSUM);
 
-    Serial.println();
-
-    Serial.print(F(" Time: ")); // time in hh:mm:ss
-    printTime(gps.time);
+//    Serial.print(F(" Time: ")); // time in hh:mm:ss
+//    printTime(gps.time);
     sendPacket(gps.time.value(), GPS_TIME, NO_DIRECTION, U_INT_32, NO_CHECKSUM);
 
-    Serial.print(F(" Lat: ")); // latitude coordinate
-    printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
+//    Serial.print(F(" Lat: ")); // latitude coordinate
+//    printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
     sendPacket(gps.location.lat(), GPS_POS, DIRECTION_X, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" Lng: ")); // longitude coordinate
-    printFloat(gps.location.lng(), gps.location.isValid(), 11, 6);
+//    Serial.print(F(" Lng: ")); // longitude coordinate
+//    printFloat(gps.location.lng(), gps.location.isValid(), 11, 6);
     sendPacket(gps.location.lng(), GPS_POS, DIRECTION_Y, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" Alt: ")); // altitude in meters
-    printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
+//    Serial.print(F(" Alt: ")); // altitude in meters
+//    printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
     sendPacket(gps.altitude.meters(), GPS_POS, DIRECTION_Z, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" Age: ")); // time in ms since last valid data
-    printInt(gps.location.age(), gps.location.isValid(), 5);
+//    Serial.print(F(" Age: ")); // time in ms since last valid data
+//    printInt(gps.location.age(), gps.location.isValid(), 5);
     sendPacket(gps.location.age(), GPS_FIX_AGE, NO_DIRECTION, U_INT_32, NO_CHECKSUM);
 
-    Serial.print(F(" Location innacuracy: "));             // Horizontal Dilution Of Precision, higher number means less confidence in horizontal position. 1-2 is very accurate,
-    printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 5, 2); // 2-5 is good, 5-10 is kinda alright, 10-20 is very rough and anything above 20 is useless
+//    Serial.print(F(" Location innacuracy: "));             // Horizontal Dilution Of Precision, higher number means less confidence in horizontal position. 1-2 is very accurate,
+//    printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 5, 2); // 2-5 is good, 5-10 is kinda alright, 10-20 is very rough and anything above 20 is useless
     sendPacket(gps.hdop.hdop(), GPS_HDOP, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" Sats: ")); // amount of satellites we are receiving data from
-    printInt(gps.satellites.value(), gps.satellites.isValid(), 2);
+//    Serial.print(F(" Sats: ")); // amount of satellites we are receiving data from
+//    printInt(gps.satellites.value(), gps.satellites.isValid(), 2);
     sendPacket((uint8_t)gps.satellites.value(), GPS_NUM_OF_SATS, NO_DIRECTION, U_INT_8, NO_CHECKSUM);
 
     unsigned long passed = gps.passedChecksum();
@@ -388,15 +387,14 @@ void loop()
     float failPercentage = (failed / (float)total) * 100.0;
     sendPacket(failPercentage, GPS_FAIL_PERCENTAGE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-    Serial.print(F(" GPS Fails %: "));
-    printFloat(failPercentage, true, 5, 1);
+//    Serial.print(F(" GPS Fails %: "));
+//    printFloat(failPercentage, true, 5, 1);
 
-    Serial.println();
-    Serial.println();
+//    Serial.println();
 
     if (millis() > 5000 && gps.charsProcessed() < 10)
     {
-        Serial.println(F("No GPS data received: check wiring"));
+//        Serial.println(F("No GPS data received: check wiring"));
     }
     else
     {
