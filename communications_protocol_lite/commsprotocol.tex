@@ -1,0 +1,138 @@
+\documentclass[a4paper]{article}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern,longtable,booktabs,array,url,xurl,hyperref,parskip}
+\usepackage{lastpage}
+\usepackage{fancyhdr}
+\usepackage{siunitx}
+\setcounter{secnumdepth}{1}
+
+\fancypagestyle{plain}{
+	\fancyhf{}
+	\fancyhead[L]{B.B.F.M. Verspaandonk, M.Y.A. Wierckx}
+	\fancyhead[R]{Cansat GAIA}
+	\fancyfoot[C]{GROUND Lite Communications Protocol\hfill Page \thepage\ of \pageref{LastPage}}
+}
+\pagestyle{plain}
+\renewcommand{\footrulewidth}{0.4pt}
+
+%\hypersetup{hidelinks}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+\title{GROUND Lite Communications Protocol Specification\\ \large Version 1.0.0}
+\date{\today}
+\author{B.B.F.M. Verspaandonk, M.Y.A. Wierckx}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Overview}
+The GROUND (GAIA Radio OUtput Network Delivery) Lite protocol is a power and data efficiency optimized version of the original GROUND protocol. All data is serialized in little-endian format, meaning the least significant byte is sent first. For example, the number \texttt{0x1234} would be transmitted as \texttt{0x34 0x12}.
+
+\section{Packet Structure}
+A packet comprises the following fields:
+\begin{longtable}{@{}lll@{}}
+\toprule
+\# & Field Name             & Size                         \\
+\midrule
+1  & \texttt{magic\_number} & 4 bytes                      \\
+2  & \texttt{content\_type} & 1 bytes                      \\
+3  & \texttt{content\_size} & 1 bytes                      \\
+4  & \texttt{content}       & \texttt{content\_size} bytes \\
+\bottomrule
+\end{longtable}
+
+\subsection{Field Descriptions}
+\textbf{\texttt{magic\_number}}: A constant value \texttt{0x67616961} (ASCII for \texttt{gaia}) that marks the start of a packet.
+
+\textbf{\texttt{content\_type}}: Specifies the type and structure of the data. Its interpreted as follows:
+\begin{longtable}{@{}lll@{}}
+  \toprule
+  Value         & Type                & Description                      \\
+  \midrule
+  \texttt{0x01} & \texttt{float GPS\_POS[3]}            & GPS coordinates                          \\
+  \texttt{0x02} & \texttt{float G\_FORCES[3]}           & G-force measurement                      \\
+  \texttt{0x03} & \texttt{float ROTATION[3]}            & Angle measurement                        \\
+  \texttt{0x04} & \texttt{uint32\_t TIME}               & Time                                     \\
+  \texttt{0x05} & \texttt{uint32\_t GPS\_FIX\_AGE}      & Time in ms since last gps fix            \\
+  \texttt{0x06} & \texttt{float GPS\_HDOP}              & Horizontal Dilution of Precision         \\
+  \texttt{0x07} & \texttt{uint8\_t GPS\_NUM\_OF\_SATS}  & Number of satellites in view             \\
+  \texttt{0x08} & \texttt{float GPS\_FAIL\_PERCENTAGE}  & Percentage of GPS cheksums failed        \\
+  \texttt{0x09} & \texttt{uint16\_t CO2\_CONCENTRATION} & \emph{UNUSED} CO$_2$ concentration in ppb\\
+  \texttt{0x0A} & \texttt{float TEMPERATURE}            & Temperature in $^\circ$C                 \\
+  \texttt{0x0B} & \texttt{float PRESSURE}               & Pressure in Pa                           \\
+  \texttt{0x0C} & \texttt{uint16\_t DUST\_CONCENTRATION}& Dust concentration in $\mu g/m^3$        \\
+  \texttt{0x0D} & \texttt{float UV\_RADIATON}           & UV radiation in $mW/cm^2$                \\
+  \texttt{0x0E} & \texttt{uint16\_t}                    & Packet number                            \\
+  \bottomrule
+\end{longtable}
+
+\textbf{\texttt{content\_size}}: The number of bytes in the \texttt{content} field.
+
+\textbf{\texttt{content}}: The actual data payload. Its interpretation depends on \texttt{content\_type}.
+
+\section{Handling \texttt{magic\_number} in Content}
+If the \texttt{magic\_number} sequence \texttt{0x67616961} appears in the \texttt{content}, it must be escaped by appending a \texttt{0x00} byte immediately after. For example:
+
+\texttt{67 61 69 61 }\textrightarrow\texttt{ 67 61 69 61 00}
+
+The escape byte contributes to \texttt{content\_size} but should be removed during packet parsing.
+
+\section{Encoding order}
+The fields in a packet are encoded in the following order:
+\begin{enumerate}
+  \item Check if the \texttt{magic\_number} sequence appears in the \texttt{content} field. If so, escape it.
+  \item Calculate the content size.
+  \item Add the \texttt{magic\_number} sequence, \texttt{content\_type}, \texttt{content\_size} and \texttt{content} fields.
+  \item Transmit the packet.
+\end{enumerate}
+
+\section{Examples}
+\subsection{Single Value}
+Packet encoding a single unsigned 16-bit integer with value \texttt{4660}:
+\begin{verbatim}
+  67 61 69 61 0B 04 00 50 7D 44
+\end{verbatim}
+\textbf{Breakdown:}
+\begin{verbatim}
+  67 61 69 61 // Magic number
+  0B          // Content type: Pressure
+  04          // Content size: 4 bytes
+  00 50 7D 44 // Content: 1013.25 Pa
+\end{verbatim}
+
+\subsection{Array}
+Packet encoding GPS coordinates (latitude, longitude) as two 64-bit doubles:
+\begin{verbatim}
+  67 61 69 61 03 0C 00 00 B4 42 9A 99 16 43 C3 F5 48 40
+\end{verbatim}
+\textbf{Breakdown:}
+\begin{verbatim}
+  67 61 69 61             // Magic number
+  03                      // Content type: Angle measurement (float ROTATION[3])
+  0C                      // Content size: 12 bytes
+  00 00 B4 42             // Angle 1: 90.0
+  9A 99 16 43             // Angle 2: 150.6
+  C3 F5 48 40             // Angle 3: 3.14
+\end{verbatim}
+
+\subsection{Escaped Magic Number}
+GPS coordinates with a \texttt{magic\_number} sequence in the content:
+\begin{verbatim}
+  67 61 69 61 01 0E 67 61 69 61 00 00 00 20 40 67 61 69 61 00
+\end{verbatim}
+\textbf{Breakdown:}
+\begin{verbatim}
+  67 61 69 61             // Magic Number
+  01                      // Content type: GPS coordinates (float GPS_POS[3])
+  0E                      // Content size: 14 bytes
+  67 61 69 61 00          // Latitude with escaped magic number: 269069370000000000000 (this isn't actually possible with GPS coordinates but you get the point it's for demonstration)
+  00 00 20 40             // Longitude: 2.5
+  67 61 69 61 00          // Altitude with escaped magic number: 269069370000000000000 (about 28441 light years above sea level)
+\end{verbatim}
+
+\end{document}
