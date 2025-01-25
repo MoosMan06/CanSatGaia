@@ -20,7 +20,7 @@
 %\hypersetup{hidelinks}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 
-\title{GROUND Lite Communications Protocol Specification\\ \large Version 1.0.0}
+\title{GROUND Lite Communications Protocol Specification\\ \large Version 1.0.1}
 \date{\today}
 \author{B.B.F.M. Verspaandonk, M.Y.A. Wierckx}
 
@@ -50,24 +50,24 @@ A packet comprises the following fields:
 \textbf{\texttt{magic\_number}}: A constant value \texttt{0x67616961} (ASCII for \texttt{gaia}) that marks the start of a packet.
 
 \textbf{\texttt{content\_type}}: Specifies the type and structure of the data. Its interpreted as follows:
-\begin{longtable}{@{}lll@{}}
+\begin{longtable}{@{}lrll@{}}
   \toprule
-  Value         & Type                & Description                      \\
+  Value         & Data Type         & Type                           & Description                      \\
   \midrule
-  \texttt{0x01} & \texttt{float GPS\_POS[3]}            & GPS coordinates                          \\
-  \texttt{0x02} & \texttt{float G\_FORCES[3]}           & G-force measurement                      \\
-  \texttt{0x03} & \texttt{float ROTATION[3]}            & Angle measurement                        \\
-  \texttt{0x04} & \texttt{uint32\_t TIME}               & Time                                     \\
-  \texttt{0x05} & \texttt{uint32\_t GPS\_FIX\_AGE}      & Time in ms since last gps fix            \\
-  \texttt{0x06} & \texttt{float GPS\_HDOP}              & Horizontal Dilution of Precision         \\
-  \texttt{0x07} & \texttt{uint8\_t GPS\_NUM\_OF\_SATS}  & Number of satellites in view             \\
-  \texttt{0x08} & \texttt{float GPS\_FAIL\_PERCENTAGE}  & Percentage of GPS cheksums failed        \\
-  \texttt{0x09} & \texttt{uint16\_t CO2\_CONCENTRATION} & \emph{UNUSED} CO$_2$ concentration in ppb\\
-  \texttt{0x0A} & \texttt{float TEMPERATURE}            & Temperature in $^\circ$C                 \\
-  \texttt{0x0B} & \texttt{float PRESSURE}               & Pressure in Pa                           \\
-  \texttt{0x0C} & \texttt{uint16\_t DUST\_CONCENTRATION}& Dust concentration in $\mu g/m^3$        \\
-  \texttt{0x0D} & \texttt{float UV\_RADIATON}           & UV radiation in $mW/cm^2$                \\
-  \texttt{0x0E} & \texttt{uint16\_t}                    & Packet number                            \\
+  \texttt{0x01} & \texttt{float}    &\texttt{GPS\_POS[3]}            & GPS coordinates                          \\
+  \texttt{0x02} & \texttt{float}    &\texttt{G\_FORCES[3]}           & G-force measurement                      \\
+  \texttt{0x03} & \texttt{float}    &\texttt{ROTATION[3]}            & Angle measurement                        \\
+  \texttt{0x04} & \texttt{uint32\_t}&\texttt{TIME}                   & Time                                     \\
+  \texttt{0x05} & \texttt{uint32\_t}&\texttt{GPS\_FIX\_AGE}          & Time in ms since last gps fix            \\
+  \texttt{0x06} & \texttt{float}    &\texttt{GPS\_HDOP}              & Horizontal Dilution of Precision         \\
+  \texttt{0x07} & \texttt{uint8\_t} &\texttt{GPS\_NUM\_OF\_SATS}     & Number of satellites in view             \\
+  \texttt{0x08} & \texttt{float}    &\texttt{GPS\_FAIL\_PERCENTAGE}  & Percentage of GPS cheksums failed        \\
+  \texttt{0x09} & \texttt{uint16\_t}&\texttt{CO2\_CONCENTRATION}     & \emph{UNUSED} CO$_2$ concentration in ppb\\
+  \texttt{0x0A} & \texttt{float}    &\texttt{TEMPERATURE}            & Temperature in $^\circ$C                 \\
+  \texttt{0x0B} & \texttt{float    }&\texttt{PRESSURE}               & Pressure in Pa                           \\
+  \texttt{0x0C} & \texttt{uint16\_t}&\texttt{DUST\_CONCENTRATION}    & Dust concentration in $\mu g/m^3$        \\
+  \texttt{0x0D} & \texttt{float}    &\texttt{UV\_RADIATON}           & UV radiation in $mW/cm^2$                \\
+  \texttt{0x0E} & \texttt{uint16\_t}&\texttt{PACKET\_NUM}             & Packet number                            \\
   \bottomrule
 \end{longtable}
 
