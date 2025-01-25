@@ -130,9 +130,12 @@ GPS coordinates with a \texttt{magic\_number} sequence in the content:
   67 61 69 61             // Magic Number
   01                      // Content type: GPS coordinates (float GPS_POS[3])
   0E                      // Content size: 14 bytes
-  67 61 69 61 00          // Latitude with escaped magic number: 269069370000000000000 (this isn't actually possible with GPS coordinates but you get the point it's for demonstration)
+  67 61 69 61 00          // Latitude with escaped magic number: 269069370000000000000 
+                             (this isn't actually possible with GPS coordinates
+                             but you get the point it's for demonstration)
   00 00 20 40             // Longitude: 2.5
-  67 61 69 61 00          // Altitude with escaped magic number: 269069370000000000000 (about 28441 light years above sea level)
+  67 61 69 61 00          // Altitude with escaped magic number: 269069370000000000000
+                             (about 28441 light years above sea level)
 \end{verbatim}
 
 \end{document}
