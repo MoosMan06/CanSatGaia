@@ -20,7 +20,7 @@
 %\hypersetup{hidelinks}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 
-\title{GROUND Lite Communications Protocol Specification\\ \large Version 1.0.1}
+\title{GROUND Lite Communications Protocol Specification\\ \large Version 1.0.2}
 \date{\today}
 \author{B.B.F.M. Verspaandonk, M.Y.A. Wierckx}
 
@@ -49,7 +49,8 @@ A packet comprises the following fields:
 \subsection{Field Descriptions}
 \textbf{\texttt{magic\_number}}: A constant value \texttt{0x67616961} (ASCII for \texttt{gaia}) that marks the start of a packet.
 
-\textbf{\texttt{content\_type}}: Specifies the type and structure of the data. Its interpreted as follows:
+\textbf{\texttt{content\_type}}: Specifies the type and structure of the data. Its definitions are listed in the table below.
+\newpage
 \begin{longtable}{@{}lrll@{}}
   \toprule
   Value         & Data Type         & Type                           & Description                      \\
@@ -93,7 +94,7 @@ The fields in a packet are encoded in the following order:
 
 \section{Examples}
 \subsection{Single Value}
-Packet encoding a single unsigned 16-bit integer with value \texttt{4660}:
+Packet encoding a single 32-bit float with value \texttt{1013.25}:
 \begin{verbatim}
   67 61 69 61 0B 04 00 50 7D 44
 \end{verbatim}
@@ -104,9 +105,9 @@ Packet encoding a single unsigned 16-bit integer with value \texttt{4660}:
   04          // Content size: 4 bytes
   00 50 7D 44 // Content: 1013.25 Pa
 \end{verbatim}
-
 \subsection{Array}
-Packet encoding GPS coordinates (latitude, longitude) as two 64-bit doubles:
+\newpage
+Packet encoding GPS coordinates (Latitude, Longitude, Altitude) as three 32-bit floats:
 \begin{verbatim}
   67 61 69 61 03 0C 00 00 B4 42 9A 99 16 43 C3 F5 48 40
 \end{verbatim}
