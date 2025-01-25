@@ -20,7 +20,7 @@
 %\hypersetup{hidelinks}
 \hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
 
-\title{GROUND Lite Communications Protocol Specification\\ \large Version 1.0.2}
+\title{GROUND Lite Communications Protocol Specification\\ \large Version 1.1.0}
 \date{\today}
 \author{B.B.F.M. Verspaandonk, M.Y.A. Wierckx}
 
@@ -40,9 +40,10 @@ A packet comprises the following fields:
 \# & Field Name             & Size                         \\
 \midrule
 1  & \texttt{magic\_number} & 4 bytes                      \\
-2  & \texttt{content\_type} & 1 bytes                      \\
-3  & \texttt{content\_size} & 1 bytes                      \\
-4  & \texttt{content}       & \texttt{content\_size} bytes \\
+2  & \texttt{packet\_number}& 2 bytes                      \\
+3  & \texttt{content\_type} & 1 bytes                      \\
+4  & \texttt{content\_size} & 1 bytes                      \\
+5  & \texttt{content}       & \texttt{content\_size} bytes \\
 \bottomrule
 \end{longtable}
 
@@ -68,7 +69,6 @@ A packet comprises the following fields:
   \texttt{0x0B} & \texttt{float    }&\texttt{PRESSURE}               & Pressure in Pa                           \\
   \texttt{0x0C} & \texttt{uint16\_t}&\texttt{DUST\_CONCENTRATION}    & Dust concentration in $\mu g/m^3$        \\
   \texttt{0x0D} & \texttt{float}    &\texttt{UV\_RADIATON}           & UV radiation in $mW/cm^2$                \\
-  \texttt{0x0E} & \texttt{uint16\_t}&\texttt{PACKET\_NUM}             & Packet number                            \\
   \bottomrule
 \end{longtable}
 
@@ -96,11 +96,12 @@ The fields in a packet are encoded in the following order:
 \subsection{Single Value}
 Packet encoding a single 32-bit float with value \texttt{1013.25}:
 \begin{verbatim}
-  67 61 69 61 0B 04 00 50 7D 44
+  67 61 69 61 01 00 0B 04 00 50 7D 44
 \end{verbatim}
 \textbf{Breakdown:}
 \begin{verbatim}
   67 61 69 61 // Magic number
+  01 00       // Packet number: 1
   0B          // Content type: Pressure
   04          // Content size: 4 bytes
   00 50 7D 44 // Content: 1013.25 Pa
@@ -109,11 +110,12 @@ Packet encoding a single 32-bit float with value \texttt{1013.25}:
 \newpage
 Packet encoding GPS coordinates (Latitude, Longitude, Altitude) as three 32-bit floats:
 \begin{verbatim}
-  67 61 69 61 03 0C 00 00 B4 42 9A 99 16 43 C3 F5 48 40
+  67 61 69 61 02 00 03 0C 00 00 B4 42 9A 99 16 43 C3 F5 48 40
 \end{verbatim}
 \textbf{Breakdown:}
 \begin{verbatim}
   67 61 69 61             // Magic number
+  02 00                   // Packet number: 2
   03                      // Content type: Angle measurement (float ROTATION[3])
   0C                      // Content size: 12 bytes
   00 00 B4 42             // Angle 1: 90.0
@@ -124,11 +126,12 @@ Packet encoding GPS coordinates (Latitude, Longitude, Altitude) as three 32-bit 
 \subsection{Escaped Magic Number}
 GPS coordinates with a \texttt{magic\_number} sequence in the content:
 \begin{verbatim}
-  67 61 69 61 01 0E 67 61 69 61 00 00 00 20 40 67 61 69 61 00
+  67 61 69 61 03 00 01 0E 67 61 69 61 00 00 00 20 40 67 61 69 61 00
 \end{verbatim}
 \textbf{Breakdown:}
 \begin{verbatim}
   67 61 69 61             // Magic Number
+  03 00                   // Packet number: 3
   01                      // Content type: GPS coordinates (float GPS_POS[3])
   0E                      // Content size: 14 bytes
   67 61 69 61 00          // Latitude with escaped magic number: 269069370000000000000 
