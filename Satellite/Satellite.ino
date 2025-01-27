@@ -60,25 +60,11 @@ SDI/SDA <-> D11  (required, MOSI)
     red <-> Resistor <-> 5v                     (required, 5v)
 */
 
-// primitive data types
-#define U_INT_8 0x00
-#define U_INT_16 0x01
-#define U_INT_32 0x02
-#define U_INT_64 0x03
-#define S_INT_8 0x04
-#define S_INT_16 0x05
-#define S_INT_32 0x06
-#define S_INT_64 0x07
-#define FLOAT 0x08
-#define DOUBLE 0x09
-#define BOOL 0x0A
-#define CHAR 0x0B
-
-// categorical data types
+// data types
 #define GPS_POS 0x01
 #define G_FORCES 0x02
 #define ROTATION 0x03
-#define GPS_TIME 0x04
+#define TIME 0x04
 #define GPS_FIX_AGE 0x05
 #define GPS_HDOP 0x06
 #define GPS_NUM_OF_SATS 0x07
@@ -89,18 +75,6 @@ SDI/SDA <-> D11  (required, MOSI)
 #define DUST_CONCENTRATION 0x0C
 #define UV_RADIATON 0x0D
 #define PACKET_NUM 0x0E
-
-// checksum types
-#define NO_CHECKSUM 0x00
-#define CRC8 0x10
-#define CRC16 0x20
-#define CRC32 0x40
-
-// sub categories
-#define NO_DIRECTION 0x00
-#define DIRECTION_X 0x10
-#define DIRECTION_Y 0x20
-#define DIRECTION_Z 0x30
 
 // pin definitions
 #define UVPIN A0
@@ -125,56 +99,105 @@ SoftwareSerial commsSerial(8, 7);
 SoftwareSerial GPSSerial(4, 3);
 
 // other constants
-static const int DEBUG = true;
+static const int DEBUG = true; // not implemented yet
 
-static const int BAUD_RATE = 19200;
+static const int BAUD_RATE = 9600;
 static const int TIMEZONE = 1;
 static const int DUST_SAMPLING_TIME = 280;
 static const int DUST_DELTA_TIME = 40;
 static const int DUST_SLEEP_TIME = 9680;
-static const byte MAGIC_NUMBER[4] = {0x47, 0x41, 0x49, 0x41};
+static const byte MAGIC_NUMBER[4] = {0x67, 0x61, 0x69, 0x61};
 
 static uint16_t packetNumber = 0;
 
 // functions
-template <typename T>
-void sendPacket(T data, byte category, byte subCategory, byte dataType, byte checksum)
+void escapeMagicNumbers(byte *array, size_t &arraySize, const size_t maxSize, const byte *pattern, size_t patternSize)
 {
+    size_t i = 0;
 
-    byte packet[255]; // can't be bothered to calculate max packet size, 255 should be enough
-
-    for (int i = 0; i < 4; i++)
+    while (i <= arraySize - patternSize)
     {
-        packet[i] = MAGIC_NUMBER[i];
-    }
-
-    packet[4] = category | checksum;
-
-    packet[5] = dataType | subCategory;
-
-    uint16_t contentSize = sizeof(data);
-
-    for (uint8_t j = 8; j <= 8 + sizeof(data); j++)
-    {
-        packet[j] = reinterpret_cast<byte *>(&data)[j - 8]; // idk how tf this works but it works for now
-    }
-
-    if (sizeof(data) >= 4)
-    {
-        if (packet[8] == MAGIC_NUMBER[0] && packet[9] == MAGIC_NUMBER[1] && packet[10] == MAGIC_NUMBER[2] && packet[11] == MAGIC_NUMBER[3])
+        // Check for a match at the current position
+        bool match = true;
+        for (size_t j = 0; j < patternSize; j++)
         {
-            packet[12] = 0x00;
-            contentSize += 1;
+            if (array[i + j] != pattern[j])
+            {
+                match = false;
+                break;
+            }
+        }
+
+        // If a match is found
+        if (match)
+        {
+            // Ensure there's room in the array to add a byte
+            if (arraySize + 1 > maxSize)
+            {
+                Serial.println("Not enough space to add 0x00 byte.");
+                return;
+            }
+
+            // Shift elements to the right to make space for 0x00
+            for (size_t j = arraySize; j > i + patternSize; j--)
+            {
+                array[j] = array[j - 1];
+            }
+
+            // Insert 0x00 after the pattern
+            array[i + patternSize] = 0x00;
+            arraySize++;
+
+            // Move past the newly inserted 0x00
+            i += patternSize + 1; // Skip past the inserted 0x00
+        }
+        else
+        {
+            i++;
         }
     }
-    // I was going to add checksum logic here, but it's 05:51 and I'm tired
-    packet[6] = contentSize & 0xFF;
-    packet[7] = (contentSize >> 8) & 0xFF;
+}
 
-    for (uint16_t k = 0; k < 8 + contentSize; k++) // 8 cuz header is 8 bytes long
+template <typename T>
+void sendPacket(const T *data, size_t dataCount, byte category, uint16_t packetNumber)
+{
+    // Calculate raw data size
+    size_t dataSize = sizeof(T) * dataCount;
+
+    // Ensure the maximum size fits within the buffer
+    const size_t maxDataSize = 16;
+    byte dataArray[maxDataSize];
+    if (dataSize > maxDataSize)
     {
-        commsSerial.write(packet[k]);
-//        Serial.print(" Y ");
+        Serial.println("Data too large to fit in the buffer.");
+        return;
+    }
+
+    // Copy data into dataArray
+    memcpy(dataArray, data, dataSize);
+
+    // Escape magic numbers within the dataArray
+    escapeMagicNumbers(dataArray, dataSize, maxDataSize, MAGIC_NUMBER, sizeof(MAGIC_NUMBER));
+
+    // Prepare the packet
+    size_t packetSize = dataSize + 8; // Adjusted size of the packet
+    byte packet[packetSize];
+
+    // Add magic number
+    memcpy(packet, MAGIC_NUMBER, 4);
+    // Add packet number
+    memcpy(packet + 4, &packetNumber, 2);
+    // Add category and data size
+    packet[6] = category;
+    packet[7] = dataSize;
+
+    // Add escaped data
+    memcpy(packet + 8, dataArray, dataSize);
+
+    // Send the packet
+    for (size_t i = 0; i < packetSize; i++)
+    {
+        Serial.write(packet[i]);
     }
 }
 
@@ -319,66 +342,65 @@ void setup()
     pinMode(DustLedPower, OUTPUT);
 }
 
+uint16_t packetNumber = 0;
+
 void loop()
 {
-//    Serial.print(F("Packet: ")); // packet number
-//    printInt(packetNumber++, true, 5);
-    sendPacket(packetNumber, PACKET_NUM, NO_DIRECTION, U_INT_16, NO_CHECKSUM);
-
-//    Serial.print(F(" Temp: ")); // temperature in *C
-//    printFloat(bmp.readTemperature(), bmp.begin(), 6, 2);
+    packetNumber++;
+    //    Serial.print(F(" Temp: ")); // temperature in *C
+    //    printFloat(bmp.readTemperature(), bmp.begin(), 6, 2);
     sendPacket(bmp.readTemperature(), TEMPERATURE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" Press: ")); // pressure in Pa
-//    printFloat(bmp.readPressure(), bmp.begin(), 8, 1);
+    //    Serial.print(F(" Press: ")); // pressure in Pa
+    //    printFloat(bmp.readPressure(), bmp.begin(), 8, 1);
     sendPacket(bmp.readPressure(), PRESSURE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" Angles: ")); // angle in degrees
-//    printXYZ(gyro.getAngles(), gyro.init(), 7, 2);
+    //    Serial.print(F(" Angles: ")); // angle in degrees
+    //    printXYZ(gyro.getAngles(), gyro.init(), 7, 2);
     sendPacket(gyro.getAngles().x, ROTATION, DIRECTION_X, FLOAT, NO_CHECKSUM);
     sendPacket(gyro.getAngles().y, ROTATION, DIRECTION_Y, FLOAT, NO_CHECKSUM);
     sendPacket(gyro.getAngles().z, ROTATION, DIRECTION_Z, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" Accel: ")); // acceleration in G
-//    printXYZ(gyro.getGValues(), gyro.init(), 6, 2);
+    //    Serial.print(F(" Accel: ")); // acceleration in G
+    //    printXYZ(gyro.getGValues(), gyro.init(), 6, 2);
     sendPacket(gyro.getGValues().x, G_FORCES, DIRECTION_X, FLOAT, NO_CHECKSUM);
     sendPacket(gyro.getGValues().y, G_FORCES, DIRECTION_Y, FLOAT, NO_CHECKSUM);
     sendPacket(gyro.getGValues().z, G_FORCES, DIRECTION_Z, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" UV: ")); // UV light intensity in mW/cm^2
-//    printFloat(UVSensor.getUV(), UVSensor.isEnabled(), 6, 2);
+    //    Serial.print(F(" UV: ")); // UV light intensity in mW/cm^2
+    //    printFloat(UVSensor.getUV(), UVSensor.isEnabled(), 6, 2);
     sendPacket(UVSensor.getUV(), UV_RADIATON, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" Dust: ")); // dust density in ug/m^3
-//    printFloat(getDustDensity(), true, 6, 2);
+    //    Serial.print(F(" Dust: ")); // dust density in ug/m^3
+    //    printFloat(getDustDensity(), true, 6, 2);
     sendPacket(getDustDensity(), DUST_CONCENTRATION, NO_DIRECTION, U_INT_16, NO_CHECKSUM);
 
-//    Serial.print(F(" Time: ")); // time in hh:mm:ss
-//    printTime(gps.time);
+    //    Serial.print(F(" Time: ")); // time in hh:mm:ss
+    //    printTime(gps.time);
     sendPacket(gps.time.value(), GPS_TIME, NO_DIRECTION, U_INT_32, NO_CHECKSUM);
 
-//    Serial.print(F(" Lat: ")); // latitude coordinate
-//    printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
+    //    Serial.print(F(" Lat: ")); // latitude coordinate
+    //    printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
     sendPacket(gps.location.lat(), GPS_POS, DIRECTION_X, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" Lng: ")); // longitude coordinate
-//    printFloat(gps.location.lng(), gps.location.isValid(), 11, 6);
+    //    Serial.print(F(" Lng: ")); // longitude coordinate
+    //    printFloat(gps.location.lng(), gps.location.isValid(), 11, 6);
     sendPacket(gps.location.lng(), GPS_POS, DIRECTION_Y, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" Alt: ")); // altitude in meters
-//    printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
+    //    Serial.print(F(" Alt: ")); // altitude in meters
+    //    printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
     sendPacket(gps.altitude.meters(), GPS_POS, DIRECTION_Z, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" Age: ")); // time in ms since last valid data
-//    printInt(gps.location.age(), gps.location.isValid(), 5);
+    //    Serial.print(F(" Age: ")); // time in ms since last valid data
+    //    printInt(gps.location.age(), gps.location.isValid(), 5);
     sendPacket(gps.location.age(), GPS_FIX_AGE, NO_DIRECTION, U_INT_32, NO_CHECKSUM);
 
-//    Serial.print(F(" Location innacuracy: "));             // Horizontal Dilution Of Precision, higher number means less confidence in horizontal position. 1-2 is very accurate,
-//    printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 5, 2); // 2-5 is good, 5-10 is kinda alright, 10-20 is very rough and anything above 20 is useless
+    //    Serial.print(F(" Location innacuracy: "));             // Horizontal Dilution Of Precision, higher number means less confidence in horizontal position. 1-2 is very accurate,
+    //    printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 5, 2); // 2-5 is good, 5-10 is kinda alright, 10-20 is very rough and anything above 20 is useless
     sendPacket(gps.hdop.hdop(), GPS_HDOP, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" Sats: ")); // amount of satellites we are receiving data from
-//    printInt(gps.satellites.value(), gps.satellites.isValid(), 2);
+    //    Serial.print(F(" Sats: ")); // amount of satellites we are receiving data from
+    //    printInt(gps.satellites.value(), gps.satellites.isValid(), 2);
     sendPacket((uint8_t)gps.satellites.value(), GPS_NUM_OF_SATS, NO_DIRECTION, U_INT_8, NO_CHECKSUM);
 
     unsigned long passed = gps.passedChecksum();
@@ -387,14 +409,14 @@ void loop()
     float failPercentage = (failed / (float)total) * 100.0;
     sendPacket(failPercentage, GPS_FAIL_PERCENTAGE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-//    Serial.print(F(" GPS Fails %: "));
-//    printFloat(failPercentage, true, 5, 1);
+    //    Serial.print(F(" GPS Fails %: "));
+    //    printFloat(failPercentage, true, 5, 1);
 
-//    Serial.println();
+    //    Serial.println();
 
     if (millis() > 5000 && gps.charsProcessed() < 10)
     {
-//        Serial.println(F("No GPS data received: check wiring"));
+        //        Serial.println(F("No GPS data received: check wiring"));
     }
     else
     {
