@@ -3,7 +3,7 @@ import struct
 import csv
 
 # Initialize the serial port (update with your serial port parameters)
-ser = serial.Serial(port='com10', baudrate=9600, timeout=0.1)
+ser = serial.Serial(port='com4', baudrate=9600, timeout=0.1)
 
 # Constants for parsing
 HEADER_SIZE = 8
@@ -20,7 +20,7 @@ with open("output.csv", "w", newline="") as f:
 def write_packet_to_csv(packet):
     with open("output.csv", "a", newline="") as f:
         writer = csv.writer(f)
-        packet_num = packet["packet_num"]
+        packet_num = packet["packet_num"] 
         data_type = packet["data_type"]
         data = packet["data"]
         match data_type:
@@ -53,7 +53,7 @@ def write_packet_to_csv(packet):
             case 0x0B:
                 writer.writerow([packet_num, data_type, "pressure", struct.unpack("<f", data[:4])[0]])
             case 0x0C:
-                writer.writerow([packet_num, data_type, "dust_concentration", struct.unpack("<H", data[:2])[0]])
+                writer.writerow([packet_num, data_type, "dust_concentration", struct.unpack("<f", data[:4])[0]])
             case 0x0D:
                 writer.writerow([packet_num, data_type, "uv_radiation", struct.unpack("<f", data[:4])[0]])
             case _:

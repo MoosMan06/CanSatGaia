@@ -74,7 +74,6 @@ SDI/SDA <-> D11  (required, MOSI)
 #define PRESSURE 0x0B
 #define DUST_CONCENTRATION 0x0C
 #define UV_RADIATON 0x0D
-#define PACKET_NUM 0x0E
 
 // pin definitions
 #define UVPIN A0
@@ -197,7 +196,7 @@ void sendPacket(const T *data, size_t dataCount, byte category, uint16_t packetN
     // Send the packet
     for (size_t i = 0; i < packetSize; i++)
     {
-        Serial.write(packet[i]);
+        commsSerial.write(packet[i]);
     }
 }
 
@@ -209,74 +208,6 @@ static void smartDelay(unsigned long ms)
         while (GPSSerial.available())
             gps.encode(GPSSerial.read());
     } while (millis() - start < ms);
-}
-
-static void printInt(unsigned long value, bool isValid, int amountOfCharacters)
-{
-    char output[32] = "*****************";
-    if (isValid)
-        snprintf(output, sizeof(output), "%lu", value);
-    output[amountOfCharacters] = 0;
-    for (int i = strlen(output); i < amountOfCharacters; ++i)
-        output[i] = '_';
-    Serial.print(output);
-    smartDelay(0);
-}
-
-static void printFloat(float value, bool isValid, int amountOfCharacters, int amountOfDecimals)
-{
-    if (!isValid)
-    {
-        while (amountOfCharacters-- > 1)
-        {
-            Serial.print('*');
-        }
-        Serial.print('*');
-    }
-    else
-    {
-        Serial.print(value, amountOfDecimals);
-        commsSerial.print(value, amountOfDecimals);
-        int valueWithoutDecimals = abs((int)value);
-        int valueLength = amountOfDecimals + (value < 0.0 ? 2 : 1); // . and -
-        do
-        {
-            valueWithoutDecimals /= 10;
-            valueLength++;
-        } while (valueWithoutDecimals > 0);
-        for (int i = valueLength; i < amountOfCharacters; ++i)
-        {
-            Serial.print('_');
-        }
-    }
-    smartDelay(0);
-}
-
-static void printTime(TinyGPSTime &time)
-{
-    if (!time.isValid())
-    {
-        Serial.print(F("********"));
-    }
-    else
-    {
-        char output[32];
-        snprintf(output, sizeof(output), "%02d:%02d:%02d", time.hour() + TIMEZONE, time.minute(), time.second());
-        Serial.print(output);
-        snprintf(output, sizeof(output), "%02d_%02d_%02d", time.hour() + TIMEZONE, time.minute(), time.second());
-    }
-    smartDelay(0);
-}
-
-static void printXYZ(xyzFloat values, bool isValid, int amountOfCharacters, int amountOfDecimals)
-{
-    printFloat(values.x, isValid, amountOfCharacters, amountOfDecimals);
-    Serial.print("/");
-    printFloat(values.y, isValid, amountOfCharacters, amountOfDecimals);
-    Serial.print("/");
-    printFloat(values.z, isValid, amountOfCharacters, amountOfDecimals);
-
-    smartDelay(0);
 }
 
 float getDustDensity()
@@ -306,117 +237,88 @@ float getDustDensity()
 void setup()
 {
     // comms
-    Serial.begin(BAUD_RATE);      // begin serial communication
-    commsSerial.begin(BAUD_RATE); // begin communication with APC220
-    GPSSerial.begin(BAUD_RATE);   // begin communication with GPS
+    Serial.begin(9600);     // begin serial communication
+    Serial.println("yes");
+    commsSerial.begin(9600); // begin communication with APC220
+    Serial.println("yes2");   
+    GPSSerial.begin(9600);   // begin communication with GPS
     Wire.begin();                 // begin communication with I2C sensors
-
-    // gyro
-    if (!gyro.init())
+    //gyro
+    if (gyro.init())
     {
-        Serial.println("gyro is not responsive");
+        Serial.println("gyro found");
+        Serial.println("Position the gyro flat and don't move it - calibrating...");
+        smartDelay(1000);
+        gyro.autoOffsets();
+        Serial.println("Done!");
+        gyro.setAccRange(MPU6500_ACC_RANGE_8G); // set g range to 16G, options are 2G, 4G, 8G, 16G. Maybe tweak this later
+        Serial.println("Gyro initialized");
     }
     else
     {
-        Serial.println("gyro initialized");
-    }
-    Serial.println("Position the gyro flat and don't move it - calibrating...");
+        Serial.println("Gyro not found, skipping gyro init");
+    }    
     smartDelay(1000);
-    gyro.autoOffsets();
-    Serial.println("Done!");
-    gyro.setAccRange(MPU6500_ACC_RANGE_8G); // set g range to 16G, options are 2G, 4G, 8G, 16G. Maybe tweak this later
-    smartDelay(1000);
-
     // temp/pres sensor
     if (!bmp.begin())
     {
-        Serial.println("temp/pres sensor is not responsive");
+        Serial.println("temp/pres sensor not found, skipping bmp280 init");
     }
     else
     {
         Serial.println("temp/pres sensor initialized");
     }
     smartDelay(1000);
-
     // dust sensor
     pinMode(DustLedPower, OUTPUT);
 }
 
-uint16_t packetNumber = 0;
-
 void loop()
 {
     packetNumber++;
-    //    Serial.print(F(" Temp: ")); // temperature in *C
-    //    printFloat(bmp.readTemperature(), bmp.begin(), 6, 2);
-    sendPacket(bmp.readTemperature(), TEMPERATURE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
 
-    //    Serial.print(F(" Press: ")); // pressure in Pa
-    //    printFloat(bmp.readPressure(), bmp.begin(), 8, 1);
-    sendPacket(bmp.readPressure(), PRESSURE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
+    float temp = bmp.readTemperature();
+    sendPacket(&temp, 1, TEMPERATURE, packetNumber);
 
-    //    Serial.print(F(" Angles: ")); // angle in degrees
-    //    printXYZ(gyro.getAngles(), gyro.init(), 7, 2);
-    sendPacket(gyro.getAngles().x, ROTATION, DIRECTION_X, FLOAT, NO_CHECKSUM);
-    sendPacket(gyro.getAngles().y, ROTATION, DIRECTION_Y, FLOAT, NO_CHECKSUM);
-    sendPacket(gyro.getAngles().z, ROTATION, DIRECTION_Z, FLOAT, NO_CHECKSUM);
+    float pressure = bmp.readPressure();
+    sendPacket(&pressure, 1, PRESSURE, packetNumber);
 
-    //    Serial.print(F(" Accel: ")); // acceleration in G
-    //    printXYZ(gyro.getGValues(), gyro.init(), 6, 2);
-    sendPacket(gyro.getGValues().x, G_FORCES, DIRECTION_X, FLOAT, NO_CHECKSUM);
-    sendPacket(gyro.getGValues().y, G_FORCES, DIRECTION_Y, FLOAT, NO_CHECKSUM);
-    sendPacket(gyro.getGValues().z, G_FORCES, DIRECTION_Z, FLOAT, NO_CHECKSUM);
+    float angles[3] = {gyro.getAngles().x, gyro.getAngles().y, gyro.getAngles().z};
+    sendPacket(angles, 3, ROTATION, packetNumber);
 
-    //    Serial.print(F(" UV: ")); // UV light intensity in mW/cm^2
-    //    printFloat(UVSensor.getUV(), UVSensor.isEnabled(), 6, 2);
-    sendPacket(UVSensor.getUV(), UV_RADIATON, NO_DIRECTION, FLOAT, NO_CHECKSUM);
+    float accel[3] = {gyro.getGValues().x, gyro.getGValues().y, gyro.getGValues().z};
+    sendPacket(accel, 3, G_FORCES, packetNumber);
 
-    //    Serial.print(F(" Dust: ")); // dust density in ug/m^3
-    //    printFloat(getDustDensity(), true, 6, 2);
-    sendPacket(getDustDensity(), DUST_CONCENTRATION, NO_DIRECTION, U_INT_16, NO_CHECKSUM);
+    float uv = UVSensor.getUV();
+    sendPacket(&uv, 1, UV_RADIATON, packetNumber);
 
-    //    Serial.print(F(" Time: ")); // time in hh:mm:ss
-    //    printTime(gps.time);
-    sendPacket(gps.time.value(), GPS_TIME, NO_DIRECTION, U_INT_32, NO_CHECKSUM);
+    float dust = getDustDensity();
+    sendPacket(&dust, 1, DUST_CONCENTRATION, packetNumber);
 
-    //    Serial.print(F(" Lat: ")); // latitude coordinate
-    //    printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
-    sendPacket(gps.location.lat(), GPS_POS, DIRECTION_X, FLOAT, NO_CHECKSUM);
+    float gpsPos[3] = {gps.location.lat(), gps.location.lng(), gps.altitude.meters()};
+    sendPacket(gpsPos, 3, GPS_POS, packetNumber);
 
-    //    Serial.print(F(" Lng: ")); // longitude coordinate
-    //    printFloat(gps.location.lng(), gps.location.isValid(), 11, 6);
-    sendPacket(gps.location.lng(), GPS_POS, DIRECTION_Y, FLOAT, NO_CHECKSUM);
+    uint32_t time = millis();
+    sendPacket(&time, 1, TIME, packetNumber);
 
-    //    Serial.print(F(" Alt: ")); // altitude in meters
-    //    printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
-    sendPacket(gps.altitude.meters(), GPS_POS, DIRECTION_Z, FLOAT, NO_CHECKSUM);
+    uint32_t age = gps.location.age();
+    sendPacket(&age, 1, GPS_FIX_AGE, packetNumber);
 
-    //    Serial.print(F(" Age: ")); // time in ms since last valid data
-    //    printInt(gps.location.age(), gps.location.isValid(), 5);
-    sendPacket(gps.location.age(), GPS_FIX_AGE, NO_DIRECTION, U_INT_32, NO_CHECKSUM);
+    float hdop = gps.hdop.hdop();
+    sendPacket(&hdop, 1, GPS_HDOP, packetNumber);
 
-    //    Serial.print(F(" Location innacuracy: "));             // Horizontal Dilution Of Precision, higher number means less confidence in horizontal position. 1-2 is very accurate,
-    //    printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 5, 2); // 2-5 is good, 5-10 is kinda alright, 10-20 is very rough and anything above 20 is useless
-    sendPacket(gps.hdop.hdop(), GPS_HDOP, NO_DIRECTION, FLOAT, NO_CHECKSUM);
-
-    //    Serial.print(F(" Sats: ")); // amount of satellites we are receiving data from
-    //    printInt(gps.satellites.value(), gps.satellites.isValid(), 2);
-    sendPacket((uint8_t)gps.satellites.value(), GPS_NUM_OF_SATS, NO_DIRECTION, U_INT_8, NO_CHECKSUM);
+    uint8_t sats = gps.satellites.value();
+    sendPacket(&sats, 1, GPS_NUM_OF_SATS, packetNumber);
 
     unsigned long passed = gps.passedChecksum();
     unsigned long failed = gps.failedChecksum();
     unsigned long total = passed + failed;
     float failPercentage = (failed / (float)total) * 100.0;
-    sendPacket(failPercentage, GPS_FAIL_PERCENTAGE, NO_DIRECTION, FLOAT, NO_CHECKSUM);
-
-    //    Serial.print(F(" GPS Fails %: "));
-    //    printFloat(failPercentage, true, 5, 1);
-
-    //    Serial.println();
+    sendPacket(&failPercentage, 1, GPS_FAIL_PERCENTAGE, packetNumber);
 
     if (millis() > 5000 && gps.charsProcessed() < 10)
     {
-        //        Serial.println(F("No GPS data received: check wiring"));
+        Serial.println(F("No GPS data received: check wiring"));
     }
     else
     {
