@@ -239,7 +239,7 @@ void setup()
     // comms
     Serial.begin(9600);     // begin serial communication
     Serial.println("yes");
-    commsSerial.begin(9600); // begin communication with APC220
+    commsSerial.begin(1200); // begin communication with APC220
     Serial.println("yes2");   
     GPSSerial.begin(9600);   // begin communication with GPS
     Wire.begin();                 // begin communication with I2C sensors
