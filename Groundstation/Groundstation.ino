@@ -7,7 +7,7 @@ SoftwareSerial commsSerial(10, 11); // RX, TX
 
 void setup() {
   Serial.begin(9600);
-  commsSerial.begin(9600);
+  commsSerial.begin(1200);
 }
 
 void loop() {
