@@ -8,7 +8,6 @@
 #include <Adafruit_BMP280.h> //temp/pressure sensor
 #include <MPU6500_WE.h>      //gyro
 #include <TinyGPS++.h>       //gps
-#include <ML8511.h>          //UV sensor
 
 /*
 Arduino NANO wiring:        if labels on NANO are hard to read, use this diagram:
@@ -47,7 +46,7 @@ SDI/SDA <-> D11  (required, MOSI)
     GND <-> GND  (required, GND)
     OUT <-> A0   (any analog pin)   -line 61 to change
     EN  <-> 3.3v (required, 3.3v)
-
+   3.3v <-> A2   (any analog pin)   -line 62 to change
   GP2Y1014AU0F          Dust sensor
   [https://circuitdigest.com/sites/default/files/circuitdiagram_mic/Arduino-Dust-Sensor-Connection.png]
   [This is hard to explain through text,  PLEASE use the link above. Replace A0 with A1 and D7 with D6]
@@ -61,22 +60,29 @@ SDI/SDA <-> D11  (required, MOSI)
 */
 
 // data types
-#define GPS_POS 0x01
-#define G_FORCES 0x02
-#define ROTATION 0x03
-#define TIME 0x04
-#define GPS_FIX_AGE 0x05
-#define GPS_HDOP 0x06
-#define GPS_NUM_OF_SATS 0x07
-#define GPS_FAIL_PERCENTAGE 0x08
-#define CO2_CONCENTRATION 0x09
-#define TEMPERATURE 0x0A
-#define PRESSURE 0x0B
-#define DUST_CONCENTRATION 0x0C
-#define UV_RADIATON 0x0D
+#define GPS_POS_LAT 0x01
+#define GPS_POS_LNG 0x02
+#define GPS_POS_ALT 0x03
+#define G_FORCES_X 0x04
+#define G_FORCES_Y 0x05
+#define G_FORCES_Z 0x06
+#define ROTATION_X 0x07
+#define ROTATION_Y 0x08
+#define ROTATION_Z 0x09
+#define TIME 0x0A
+#define GPS_FIX_AGE 0x0B
+#define GPS_HDOP 0x0C
+#define GPS_NUM_OF_SATS 0x0D
+#define GPS_FAIL_PERCENTAGE 0x0E
+#define CO2_CONCENTRATION 0x0F
+#define TEMPERATURE 0x10
+#define PRESSURE 0x11
+#define DUST_CONCENTRATION 0x12
+#define UV_RADIATON 0x13
 
 // pin definitions
-#define UVPIN A0
+#define UV_OUT A0
+#define UV_REF A2
 #define DustMeasurePin A1
 #define DustLedPower 6
 #define BMP_SCK 13
@@ -87,7 +93,6 @@ SDI/SDA <-> D11  (required, MOSI)
 
 // sensor objects
 TinyGPSPlus gps;
-ML8511 UVSensor(UVPIN);
 MPU6500_WE gyro = MPU6500_WE(MPU6500_ADDR);
 Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO, BMP_SCK);
 
@@ -234,15 +239,57 @@ float getDustDensity()
     return dustDensity;
 }
 
+float readUVIntensity() {
+    // First, average multiple readings for more stable results
+    byte numberOfReadings = 8;
+    
+    // Take multiple readings and average them
+    unsigned int uvLevel = 0;
+    unsigned int refLevel = 0;
+    
+    for(int x = 0; x < numberOfReadings; x++) {
+      uvLevel += analogRead(UV_OUT);
+      refLevel += analogRead(UV_REF);
+    }
+    
+    // Calculate averages
+    uvLevel /= numberOfReadings;
+    refLevel /= numberOfReadings;
+    
+    // Use the 3.3V reference to calculate accurate voltage
+    float outputVoltage = 3.3 / refLevel * uvLevel;
+    
+    // Convert voltage to UV intensity (mW/cm^2)
+    float uvIntensity = (outputVoltage - 0.99) * (15.0 - 0.0) / (2.8 - 0.99) + 0.0;
+    
+    // Output readings to Serial monitor
+    Serial.print("Reference level: ");
+    Serial.print(refLevel);
+    Serial.print(" / ML8511 output: ");
+    Serial.print(uvLevel);
+    Serial.print(" / ML8511 voltage: ");
+    Serial.print(outputVoltage);
+    Serial.print(" / UV Intensity (mW/cm^2): ");
+    Serial.print(uvIntensity);
+    Serial.println();
+    
+    // Add small delay
+    delay(100);
+    
+    return uvIntensity;
+  }
+
 void setup()
 {
     // comms
-    Serial.begin(9600);     // begin serial communication
-    Serial.println("yes");
-    commsSerial.begin(1200); // begin communication with APC220
-    Serial.println("yes2");   
-    GPSSerial.begin(9600);   // begin communication with GPS
-    Wire.begin();                 // begin communication with I2C sensors
+    Serial.begin(9600);
+    Serial.println("Serial communication start");
+    commsSerial.begin(1200);
+    Serial.println("Comms communication start");   
+    GPSSerial.begin(9600);
+    Serial.println("GPS communication start");
+    Wire.begin();
+    Serial.println("I2C communication start");
     //gyro
     if (gyro.init())
     {
@@ -269,8 +316,12 @@ void setup()
         Serial.println("temp/pres sensor initialized");
     }
     smartDelay(1000);
-    // dust sensor
+    // dust sensor and uv sensor pins
     pinMode(DustLedPower, OUTPUT);
+    pinMode(UV_OUT, INPUT);
+    pinMode(UV_REF, INPUT);
+    Serial.println("Dust and UV sensors initialized");
+    smartDelay(1000);
 }
 
 void loop()
@@ -278,44 +329,71 @@ void loop()
     packetNumber++;
 
     float temp = bmp.readTemperature();
-    sendPacket(&temp, 1, TEMPERATURE, packetNumber);
+    int16_t tempInt = temp * 100;
+    Serial.print("Temperature: ");
+    Serial.println(temp);
+    sendPacket(&tempInt, 1, TEMPERATURE, packetNumber);
 
     float pressure = bmp.readPressure();
+    Serial.print("Pressure: ");
+    Serial.println(pressure);
     sendPacket(&pressure, 1, PRESSURE, packetNumber);
 
     float angles[3] = {gyro.getAngles().x, gyro.getAngles().y, gyro.getAngles().z};
-    sendPacket(angles, 3, ROTATION, packetNumber);
-
+    sendPacket(angles[0], 1, ROTATION_, packetNumber);
+    //QUICK INLINE TODO FOR WHEN I CONTINUE IN LIKE 20 MINUTES:
+    // make sendPacket take a variable, not a pointer
+    // fix python to support new optimizations
+    // make magic number smaller
     float accel[3] = {gyro.getGValues().x, gyro.getGValues().y, gyro.getGValues().z};
     sendPacket(accel, 3, G_FORCES, packetNumber);
+    Serial.println("Accel:");
+    Serial.println(accel[0]);
+    Serial.println(accel[1]);
+    Serial.println(accel[2]);
 
-    float uv = UVSensor.getUV();
-    sendPacket(&uv, 1, UV_RADIATON, packetNumber);
+    float uv = readUVIntensity();
+    int16_t uvInt = uv * 100;
+    sendPacket(&uvInt, 1, UV_RADIATON, packetNumber);
+    Serial.print("UV: ");
+    Serial.println(uv);
 
     float dust = getDustDensity();
     sendPacket(&dust, 1, DUST_CONCENTRATION, packetNumber);
+    Serial.print("Dust: ");
+    Serial.println(dust);
 
     float gpsPos[3] = {gps.location.lat(), gps.location.lng(), gps.altitude.meters()};
     sendPacket(gpsPos, 3, GPS_POS, packetNumber);
+    Serial.print("GPS: ");
+    Serial.println(gpsPos[0]);
+    Serial.println(gpsPos[1]);
+    Serial.println(gpsPos[2]);
 
     uint32_t time = millis();
     sendPacket(&time, 1, TIME, packetNumber);
+    Serial.print("Time: ");
+    Serial.println(time);
 
     uint32_t age = gps.location.age();
     sendPacket(&age, 1, GPS_FIX_AGE, packetNumber);
+    Serial.print("Fix age: ");
+    Serial.println(age);
 
     float hdop = gps.hdop.hdop();
     sendPacket(&hdop, 1, GPS_HDOP, packetNumber);
+    Serial.print("HDOP: ");
+    Serial.println(hdop);
 
     uint8_t sats = gps.satellites.value();
     sendPacket(&sats, 1, GPS_NUM_OF_SATS, packetNumber);
-
+    Serial.println(sats);
     unsigned long passed = gps.passedChecksum();
     unsigned long failed = gps.failedChecksum();
     unsigned long total = passed + failed;
     float failPercentage = (failed / (float)total) * 100.0;
     sendPacket(&failPercentage, 1, GPS_FAIL_PERCENTAGE, packetNumber);
-
+    Serial.println(failPercentage);
     if (millis() > 5000 && gps.charsProcessed() < 10)
     {
         Serial.println(F("No GPS data received: check wiring"));
